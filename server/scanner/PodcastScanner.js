@@ -47,7 +47,8 @@ class PodcastScanner {
     const media = await existingLibraryItem.getMedia({
       include: [
         {
-          model: Database.podcastEpisodeModel
+          model: Database.podcastEpisodeModel,
+          required: false
         }
       ]
     })

@@ -171,7 +171,8 @@ class LibraryItem extends Model {
         {
           model: this.sequelize.models.podcast,
           include: {
-            model: this.sequelize.models.podcastEpisode
+            model: this.sequelize.models.podcastEpisode,
+            required: false
           }
         }
       ],
@@ -188,7 +189,7 @@ class LibraryItem extends Model {
    * @param {string} libraryItemId
    * @returns {Promise<LibraryItemExpanded>}
    */
-  static async getExpandedById(libraryItemId) {
+  static async getExpandedById(libraryItemId, includeVideoEpisodes = false) {
     if (!libraryItemId) return null
 
     const libraryItem = await this.findByPk(libraryItemId)
@@ -201,7 +202,8 @@ class LibraryItem extends Model {
       libraryItem.media = await libraryItem.getMedia({
         include: [
           {
-            model: this.sequelize.models.podcastEpisode
+            model: includeVideoEpisodes ? this.sequelize.models.podcastEpisode.unscoped() : this.sequelize.models.podcastEpisode,
+            required: false
           }
         ]
       })
@@ -253,7 +255,8 @@ class LibraryItem extends Model {
       libraryItem.media = await libraryItem.getMedia({
         include: [
           {
-            model: this.sequelize.models.podcastEpisode
+            model: this.sequelize.models.podcastEpisode,
+            required: false
           }
         ]
       })
@@ -876,7 +879,8 @@ class LibraryItem extends Model {
       return this.getMedia({
         include: [
           {
-            model: this.sequelize.models.podcastEpisode
+            model: this.sequelize.models.podcastEpisode,
+            required: false
           }
         ]
       })
@@ -1041,12 +1045,12 @@ class LibraryItem extends Model {
    * Expanded library item JSON for item detail and socket events.
    * Must be a strict superset of `toOldJSONMinified()` — built by spreading minified, then adding expanded-only fields.
    */
-  toOldJSONExpanded() {
+  toOldJSONExpanded(includeVideoEpisodes = false) {
     return {
       ...this.toOldJSONMinified(),
       lastScan: this.lastScan?.valueOf(),
       scanVersion: this.lastScanVersion,
-      media: this.media.toOldJSONExpanded(this.id),
+      media: this.media.toOldJSONExpanded(this.id, includeVideoEpisodes),
       // LibraryFile JSON includes a fileType property that may not be saved in libraryFiles column in the database
       libraryFiles: this.getLibraryFilesJson()
     }

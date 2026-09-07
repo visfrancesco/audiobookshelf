@@ -425,7 +425,8 @@ class LibraryController {
                 model: Database.podcastModel,
                 attributes: ['id'],
                 include: {
-                  model: Database.podcastEpisodeModel,
+                  model: Database.podcastEpisodeModel.unscoped(),
+                  required: false,
                   attributes: ['id']
                 }
               },
@@ -548,7 +549,8 @@ class LibraryController {
           model: Database.podcastModel,
           attributes: ['id'],
           include: {
-            model: Database.podcastEpisodeModel,
+            model: Database.podcastEpisodeModel.unscoped(),
+            required: false,
             attributes: ['id']
           }
         }
@@ -671,7 +673,8 @@ class LibraryController {
           model: Database.podcastModel,
           attributes: ['id'],
           include: {
-            model: Database.podcastEpisodeModel,
+            model: Database.podcastEpisodeModel.unscoped(),
+            required: false,
             attributes: ['id']
           }
         },

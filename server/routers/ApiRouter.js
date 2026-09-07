@@ -62,6 +62,18 @@ class ApiRouter {
   }
 
   init() {
+    const videoPodcasts = require('../managers/VideoPodcastManager')
+    this.router.get('/capabilities', (req, res) => res.json({ videoPodcastsV1: videoPodcasts.enabled }))
+    this.router.get('/video-imports', async (req, res) => {
+      if (!req.user.isAdminOrUp) return res.sendStatus(403)
+      try { res.json(await videoPodcasts.records.findAll({ order: [['updatedAt', 'DESC']], limit: 200 })) }
+      catch (error) { res.status(500).json({ error: error.message }) }
+    })
+    this.router.post('/video-imports', async (req, res) => {
+      if (!req.user.isAdminOrUp) return res.sendStatus(403)
+      try { res.status(202).json(await videoPodcasts.enqueue(req.body.manifest || req.body, req.body.restore === true)) }
+      catch (error) { res.status(error.status || 400).json({ error: error.message }) }
+    })
     //
     // Library Routes
     //
@@ -371,6 +383,13 @@ class ApiRouter {
    * @param {string} libraryId
    */
   async handleDeleteLibraryItem(libraryItemId, mediaItemIds, libraryId) {
+    const videoPodcasts = require('../managers/VideoPodcastManager')
+    for (const record of await videoPodcasts.records.findAll({ where: { libraryItemId } })) {
+      if (record.episodeId) {
+        if (!mediaItemIds.includes(record.episodeId)) mediaItemIds.push(record.episodeId)
+        await videoPodcasts.excludeEpisode(record.episodeId)
+      } else await videoPodcasts.withRecordLock(record.id, () => record.update({ state: 'excluded' }))
+    }
     const numProgressRemoved = await Database.mediaProgressModel.destroy({
       where: {
         mediaItemId: mediaItemIds

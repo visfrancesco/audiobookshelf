@@ -70,7 +70,7 @@ class LibraryItemController {
   async findOne(req, res) {
     const includeEntities = (req.query.include || '').split(',')
     if (req.query.expanded == 1) {
-      const item = req.libraryItem.toOldJSONExpanded()
+      const item = req.libraryItem.toOldJSONExpanded(req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').enabled)
 
       // Include users media progress
       if (includeEntities.includes('progress')) {
@@ -1028,8 +1028,8 @@ class LibraryItemController {
       if (!req.libraryItem.media.hasMediaFiles) {
         req.libraryItem.isMissing = true
       }
-    } else if (req.libraryItem.media.podcastEpisodes.some((ep) => ep.audioFile.ino === req.params.fileid)) {
-      const episodeToRemove = req.libraryItem.media.podcastEpisodes.find((ep) => ep.audioFile.ino === req.params.fileid)
+    } else if (req.libraryItem.media.podcastEpisodes.some((ep) => ep.audioFile?.ino === req.params.fileid)) {
+      const episodeToRemove = req.libraryItem.media.podcastEpisodes.find((ep) => ep.audioFile?.ino === req.params.fileid)
       // Remove episode from all playlists
       await Database.playlistModel.removeMediaItemsFromPlaylists([episodeToRemove.id])
 
@@ -1046,7 +1046,7 @@ class LibraryItemController {
       // Remove episode
       await episodeToRemove.destroy()
 
-      req.libraryItem.media.podcastEpisodes = req.libraryItem.media.podcastEpisodes.filter((ep) => ep.audioFile.ino !== req.params.fileid)
+      req.libraryItem.media.podcastEpisodes = req.libraryItem.media.podcastEpisodes.filter((ep) => ep.audioFile?.ino !== req.params.fileid)
     }
 
     if (req.libraryItem.media.changed()) {
@@ -1214,7 +1214,7 @@ class LibraryItemController {
    * @param {NextFunction} next
    */
   async middleware(req, res, next) {
-    req.libraryItem = await Database.libraryItemModel.getExpandedById(req.params.id)
+    req.libraryItem = await Database.libraryItemModel.getExpandedById(req.params.id, req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').enabled)
     if (!req.libraryItem?.media) return res.sendStatus(404)
 
     // Check user can access this library item

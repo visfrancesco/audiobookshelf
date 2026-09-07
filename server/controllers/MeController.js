@@ -142,7 +142,7 @@ class MeController {
       return res.sendStatus(403)
     }
 
-    const bookmarks = req.user.bookmarks?.filter((bookmark) => bookmark.libraryItemId === libraryItem.id).map((bookmark) => ({ ...bookmark })) || []
+    const bookmarks = req.user.bookmarks?.filter((bookmark) => bookmark.libraryItemId === libraryItem.id && (bookmark.episodeId || null) === (req.query.episodeId || null)).map((bookmark) => ({ ...bookmark })) || []
     res.json({ bookmarks })
   }
 
@@ -184,9 +184,9 @@ class MeController {
    */
   async getItemListeningSessions(req, res) {
     const libraryItem = await Database.libraryItemModel.getExpandedById(req.params.libraryItemId)
-    const episode = await Database.podcastEpisodeModel.findByPk(req.params.episodeId)
+    const episode = await Database.podcastEpisodeModel.unscoped().findByPk(req.params.episodeId)
 
-    if (!libraryItem || (libraryItem.isPodcast && !episode)) {
+    if (!libraryItem || (libraryItem.isPodcast && (!episode || episode.podcastId !== libraryItem.mediaId))) {
       Logger.error(`[MeController] Media item not found for library item id "${req.params.libraryItemId}"`)
       return res.sendStatus(404)
     }
@@ -336,6 +336,11 @@ class MeController {
       return res.sendStatus(403)
     }
 
+    const episodeId = req.body.episodeId || null
+    if (episodeId) {
+      const episode = await Database.podcastEpisodeModel.unscoped().findByPk(episodeId)
+      if (!episode || episode.podcastId !== libraryItem.mediaId) return res.sendStatus(404)
+    }
     const { time, title } = req.body
     if (isNullOrNaN(time)) {
       Logger.error(`[MeController] createBookmark invalid time`, time)
@@ -346,7 +351,7 @@ class MeController {
       return res.status(400).send('Invalid title')
     }
 
-    const bookmark = await req.user.createBookmark(req.params.id, time, title)
+    const bookmark = await req.user.createBookmark(req.params.id, time, title, episodeId)
     SocketAuthority.clientEmitter(req.user.id, 'user_updated', req.user.toOldJSONForBrowser())
     res.json(bookmark)
   }
@@ -369,6 +374,11 @@ class MeController {
       return res.sendStatus(403)
     }
 
+    const episodeId = req.body.episodeId || null
+    if (episodeId) {
+      const episode = await Database.podcastEpisodeModel.unscoped().findByPk(episodeId)
+      if (!episode || episode.podcastId !== libraryItem.mediaId) return res.sendStatus(404)
+    }
     const { time, title } = req.body
     if (isNullOrNaN(time)) {
       Logger.error(`[MeController] updateBookmark invalid time`, time)
@@ -379,7 +389,7 @@ class MeController {
       return res.status(400).send('Invalid title')
     }
 
-    const bookmark = await req.user.updateBookmark(req.params.id, time, title)
+    const bookmark = await req.user.updateBookmark(req.params.id, time, title, episodeId)
     if (!bookmark) {
       Logger.error(`[MeController] updateBookmark not found for library item id "${req.params.id}" and time "${time}"`)
       return res.sendStatus(404)
@@ -412,12 +422,12 @@ class MeController {
       return res.status(400).send('Invalid time')
     }
 
-    if (!req.user.findBookmark(req.params.id, time)) {
+    if (!req.user.findBookmark(req.params.id, time, req.query.episodeId || null)) {
       Logger.error(`[MeController] removeBookmark not found`)
       return res.sendStatus(404)
     }
 
-    await req.user.removeBookmark(req.params.id, time)
+    await req.user.removeBookmark(req.params.id, time, req.query.episodeId || null)
 
     SocketAuthority.clientEmitter(req.user.id, 'user_updated', req.user.toOldJSONForBrowser())
     res.sendStatus(200)

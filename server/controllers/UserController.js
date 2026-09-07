@@ -73,7 +73,8 @@ class UserController {
           attributes: ['id', 'title', 'coverPath', 'updatedAt']
         },
         {
-          model: Database.podcastEpisodeModel,
+          model: Database.podcastEpisodeModel.unscoped(),
+          required: false,
           attributes: ['id', 'title'],
           include: {
             model: Database.podcastModel,

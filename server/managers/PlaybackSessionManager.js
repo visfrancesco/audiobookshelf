@@ -1,5 +1,8 @@
 const uuidv4 = require('uuid').v4
 const Path = require('path')
+const VideoPodcasts = require('./VideoPodcastManager')
+const { VideoAudioStream } = require('../objects/VideoAudioStream')
+const { playbackError } = require('../utils/videoPodcastUtils')
 const serverVersion = require('../../package.json').version
 const Logger = require('../Logger')
 const SocketAuthority = require('../SocketAuthority')
@@ -81,8 +84,13 @@ class PlaybackSessionManager {
     const deviceInfo = await this.getDeviceInfo(req, req.body?.deviceInfo)
     Logger.debug(`[PlaybackSessionManager] startSessionRequest for device ${deviceInfo.deviceDescription}`)
     const { libraryItem, body: options } = req
-    const session = await this.startSession(req.user, deviceInfo, libraryItem, episodeId, options)
-    res.json(session.toJSONForClient(libraryItem))
+    try {
+      const session = await this.startSession(req.user, deviceInfo, libraryItem, episodeId, options)
+      res.json(session.toJSONForClient(libraryItem))
+    } catch (error) {
+      Logger.warn('[PlaybackSessionManager] Playback request failed', error.message)
+      res.status(error.status || 500).json({ error: error.message })
+    }
   }
 
   /**
@@ -311,6 +319,13 @@ class PlaybackSessionManager {
    * @returns {Promise<PlaybackSession>}
    */
   async startSession(user, deviceInfo, libraryItem, episodeId, options) {
+    const episode = libraryItem.isPodcast ? libraryItem.media.podcastEpisodes.find(ep => ep.id === episodeId) : null
+    const mode = options.mode || 'audio'
+    if (!['audio', 'video'].includes(mode)) throw playbackError('Unknown playback mode', 400)
+    if (mode === 'video' && !episode?.videoSource) throw playbackError('This episode has no video', 422)
+    if (options.startTime !== undefined && (typeof options.startTime !== 'number' || !Number.isFinite(options.startTime) || options.startTime < 0)) throw playbackError('Invalid startTime', 400)
+    const videoPath = episode?.videoSource ? await VideoPodcasts.validateSource(episode, mode) : null
+    // Validate the target before closing the current session.
     // Close any sessions already open for user and device
     const userSessions = this.sessions.filter((playbackSession) => playbackSession.userId === user.id && playbackSession.deviceId === deviceInfo.id)
     for (const session of userSessions) {
@@ -318,7 +333,7 @@ class PlaybackSessionManager {
       await this.closeSession(user, session, null)
     }
 
-    const shouldDirectPlay = options.forceDirectPlay || (!options.forceTranscode && libraryItem.media.checkCanDirectPlay(options.supportedMimeTypes, episodeId))
+    const shouldDirectPlay = !videoPath && (options.forceDirectPlay || (!options.forceTranscode && libraryItem.media.checkCanDirectPlay(options.supportedMimeTypes, episodeId)))
     const mediaPlayer = options.mediaPlayer || 'unknown'
 
     const mediaItemId = episodeId || libraryItem.media.id
@@ -332,11 +347,25 @@ class PlaybackSessionManager {
         userStartTime = Number.parseFloat(userProgress.currentTime) || 0
       }
     }
+    if (options.startTime !== undefined) userStartTime = Math.min(options.startTime, libraryItem.media.getPlaybackDuration(episodeId))
     const newPlaybackSession = new PlaybackSession()
     newPlaybackSession.setData(libraryItem, user.id, mediaPlayer, deviceInfo, userStartTime, episodeId)
 
     let audioTracks = []
-    if (shouldDirectPlay) {
+    if (videoPath && mode === 'video') {
+      newPlaybackSession.playMethod = PlayMethod.DIRECTPLAY
+      newPlaybackSession.videoEpisode = episode
+      newPlaybackSession.playbackMedia = { mode, delivery: 'file', contentUrl: `/public/session/${newPlaybackSession.id}/video`, mimeType: 'video/mp4' }
+    } else if (videoPath) {
+      const stream = new VideoAudioStream(newPlaybackSession.id, this.StreamsPath, episode, videoPath, VideoPodcasts.budget)
+      await stream.generatePlaylist()
+      newPlaybackSession.stream = stream
+      newPlaybackSession.videoEpisode = episode
+      newPlaybackSession.playMethod = PlayMethod.TRANSCODE
+      audioTracks = [stream.getAudioTrack()]
+      newPlaybackSession.playbackMedia = { mode, delivery: 'hls', contentUrl: stream.clientPlaylistUri, mimeType: 'application/vnd.apple.mpegurl' }
+      stream.on('closed', () => { newPlaybackSession.stream = null })
+    } else if (shouldDirectPlay) {
       Logger.debug(`[PlaybackSessionManager] "${user.username}" starting direct play session for item "${libraryItem.id}" with id ${newPlaybackSession.id} (Device: ${newPlaybackSession.deviceDescription})`)
       audioTracks = libraryItem.getTrackList(episodeId)
       newPlaybackSession.playMethod = PlayMethod.DIRECTPLAY
@@ -448,10 +477,11 @@ class PlaybackSessionManager {
   async removeSession(sessionId) {
     const session = this.sessions.find((s) => s.id === sessionId)
     if (!session) return
+    this.sessions = this.sessions.filter((s) => s.id !== sessionId)
+    for (const response of session.videoResponses || []) response.destroy()
     if (session.stream) {
       await session.stream.close()
     }
-    this.sessions = this.sessions.filter((s) => s.id !== sessionId)
     Logger.debug(`[PlaybackSessionManager] Removed session "${sessionId}"`)
   }
 
@@ -488,7 +518,7 @@ class PlaybackSessionManager {
    */
   async closeStaleOpenSessions() {
     const updatedAtTimeCutoff = Date.now() - 1000 * 60 * 60 * 36
-    const staleSessions = this.sessions.filter((session) => session.updatedAt < updatedAtTimeCutoff)
+    const staleSessions = this.sessions.filter((session) => session.updatedAt < (session.videoEpisode ? Date.now() - 30 * 60 * 1000 : updatedAtTimeCutoff))
     for (const session of staleSessions) {
       const sessionLastUpdate = new Date(session.updatedAt)
       Logger.info(`[PlaybackSessionManager] Closing stale session "${session.displayTitle}" (${session.id}) last updated at ${sessionLastUpdate}`)

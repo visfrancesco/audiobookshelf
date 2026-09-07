@@ -509,7 +509,10 @@ class PodcastController {
     // Remove it from the podcastEpisodes array
     req.libraryItem.media.podcastEpisodes = req.libraryItem.media.podcastEpisodes.filter((ep) => ep.id !== episodeId)
 
-    if (hardDelete) {
+    if (episode.videoSource) {
+      await require('../managers/VideoPodcastManager').excludeEpisode(episodeId)
+    }
+    if (hardDelete && episode.audioFile) {
       const audioFile = episode.audioFile
       // TODO: this will trigger the watcher. should maybe handle this gracefully
       await fs
@@ -539,12 +542,12 @@ class PodcastController {
     await episode.destroy()
 
     // Remove library file
-    req.libraryItem.libraryFiles = req.libraryItem.libraryFiles.filter((file) => file.ino !== episode.audioFile.ino)
+    req.libraryItem.libraryFiles = req.libraryItem.libraryFiles.filter((file) => file.ino !== episode.audioFile?.ino)
     req.libraryItem.changed('libraryFiles', true)
     await req.libraryItem.save()
 
     // update number of episodes
-    req.libraryItem.media.numEpisodes = req.libraryItem.media.podcastEpisodes.length
+    req.libraryItem.media.numEpisodes = req.libraryItem.media.podcastEpisodes.filter(ep => !ep.videoSource).length
     await req.libraryItem.media.save()
 
     SocketAuthority.libraryItemEmitter('item_updated', req.libraryItem)
@@ -558,7 +561,7 @@ class PodcastController {
    * @param {NextFunction} next
    */
   async middleware(req, res, next) {
-    const libraryItem = await Database.libraryItemModel.getExpandedById(req.params.id)
+    const libraryItem = await Database.libraryItemModel.getExpandedById(req.params.id, req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').enabled)
     if (!libraryItem?.media) return res.sendStatus(404)
 
     if (!libraryItem.isPodcast) {

@@ -309,7 +309,7 @@ class Podcast extends Model {
       Logger.error(`[Podcast] checkCanDirectPlay: episode not found`, episodeId)
       return false
     }
-    return supportedMimeTypes.includes(episode.audioFile.mimeType)
+    return !episode.videoSource && !!episode.audioFile && supportedMimeTypes.includes(episode.audioFile.mimeType)
   }
 
   /**
@@ -329,7 +329,7 @@ class Podcast extends Model {
     }
 
     const audioTrack = episode.getAudioTrack(libraryItemId)
-    return [audioTrack]
+    return audioTrack ? [audioTrack] : []
   }
 
   /**
@@ -479,7 +479,7 @@ class Podcast extends Model {
    *
    * @param {string} libraryItemId
    */
-  toOldJSONExpanded(libraryItemId) {
+  toOldJSONExpanded(libraryItemId, includeVideoEpisodes = false) {
     if (!libraryItemId) {
       throw new Error(`[Podcast] Cannot convert to old JSON because libraryItemId is not provided`)
     }
@@ -490,7 +490,8 @@ class Podcast extends Model {
     return {
       ...this.toOldJSONMinified(),
       libraryItemId,
-      episodes: this.podcastEpisodes.map((e) => e.toOldJSONExpanded(libraryItemId))
+      numEpisodes: this.podcastEpisodes.filter(e => includeVideoEpisodes || !e.videoSource).length,
+      episodes: this.podcastEpisodes.filter(e => includeVideoEpisodes || !e.videoSource).map((e) => e.toOldJSONExpanded(libraryItemId))
     }
   }
 }

@@ -43,13 +43,13 @@ class MediaProbeData {
   }
 
   setData(data) {
-    this.embeddedCoverArt = data.video_stream?.codec || null
+    this.embeddedCoverArt = data.cover_stream?.codec || null
     this.format = data.format
     this.duration = data.duration
     this.size = data.size
 
-    this.audioStream = data.audio_stream
-    this.videoStream = this.embeddedCoverArt ? null : data.video_stream || null
+    this.audioStream = data.audio_stream || {}
+    this.videoStream = data.video_stream || null
 
     this.bitRate = this.audioStream.bit_rate || data.bit_rate
     this.codec = this.audioStream.codec
