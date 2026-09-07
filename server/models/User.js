@@ -733,7 +733,7 @@ class User extends Model {
     let mediaItemId = null
     let podcastId = null
     if (progressPayload.episodeId) {
-      const podcastEpisode = await this.sequelize.models.podcastEpisode.findByPk(progressPayload.episodeId, {
+      const podcastEpisode = await this.sequelize.models.podcastEpisode.unscoped().findByPk(progressPayload.episodeId, {
         attributes: ['id', 'podcastId'],
         include: [
           {
@@ -757,6 +757,9 @@ class User extends Model {
           error: 'Episode not found',
           statusCode: 404
         }
+      }
+      if (podcastEpisode.podcast?.libraryItem?.id !== progressPayload.libraryItemId) {
+        return { error: 'Episode does not belong to this library item', statusCode: 400 }
       }
       mediaItemId = podcastEpisode.id
       mediaProgress = podcastEpisode.mediaProgresses?.[0]
@@ -838,8 +841,8 @@ class User extends Model {
    * @param {number} time
    * @returns {AudioBookmarkObject|null}
    */
-  findBookmark(libraryItemId, time) {
-    return this.bookmarks.find((bm) => bm.libraryItemId === libraryItemId && bm.time == time)
+  findBookmark(libraryItemId, time, episodeId = null) {
+    return this.bookmarks.find((bm) => bm.libraryItemId === libraryItemId && bm.time == time && (bm.episodeId || null) === episodeId)
   }
 
   /**
@@ -850,8 +853,8 @@ class User extends Model {
    * @param {string} title
    * @returns {Promise<AudioBookmarkObject>}
    */
-  async createBookmark(libraryItemId, time, title) {
-    const existingBookmark = this.findBookmark(libraryItemId, time)
+  async createBookmark(libraryItemId, time, title, episodeId = null) {
+    const existingBookmark = this.findBookmark(libraryItemId, time, episodeId)
     if (existingBookmark) {
       Logger.warn('[User] Create Bookmark already exists for this time')
       if (existingBookmark.title !== title) {
@@ -864,6 +867,7 @@ class User extends Model {
 
     const newBookmark = {
       libraryItemId,
+      ...(episodeId ? { episodeId } : {}),
       time,
       title,
       createdAt: Date.now()
@@ -882,8 +886,8 @@ class User extends Model {
    * @param {string} title
    * @returns {Promise<AudioBookmarkObject>}
    */
-  async updateBookmark(libraryItemId, time, title) {
-    const bookmark = this.findBookmark(libraryItemId, time)
+  async updateBookmark(libraryItemId, time, title, episodeId = null) {
+    const bookmark = this.findBookmark(libraryItemId, time, episodeId)
     if (!bookmark) {
       Logger.error(`[User] updateBookmark not found`)
       return null
@@ -901,12 +905,12 @@ class User extends Model {
    * @param {number} time
    * @returns {Promise<boolean>} - true if bookmark was removed
    */
-  async removeBookmark(libraryItemId, time) {
-    if (!this.findBookmark(libraryItemId, time)) {
+  async removeBookmark(libraryItemId, time, episodeId = null) {
+    if (!this.findBookmark(libraryItemId, time, episodeId)) {
       Logger.error(`[User] removeBookmark not found`)
       return false
     }
-    this.bookmarks = this.bookmarks.filter((bm) => bm.libraryItemId !== libraryItemId || bm.time !== time)
+    this.bookmarks = this.bookmarks.filter((bm) => bm.libraryItemId !== libraryItemId || bm.time !== time || (bm.episodeId || null) !== episodeId)
     this.changed('bookmarks', true)
     await this.save()
     return true

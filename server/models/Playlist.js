@@ -71,6 +71,7 @@ class Playlist extends Model {
           },
           {
             model: this.sequelize.models.podcastEpisode,
+            required: false,
             include: {
               model: this.sequelize.models.podcast,
               include: this.sequelize.models.libraryItem
@@ -128,6 +129,7 @@ class Playlist extends Model {
               },
               {
                 model: this.sequelize.models.podcastEpisode,
+                required: false,
                 include: {
                   model: this.sequelize.models.podcast,
                   include: this.sequelize.models.libraryItem
@@ -294,6 +296,7 @@ class Playlist extends Model {
         },
         {
           model: this.sequelize.models.podcastEpisode,
+          required: false,
           include: [
             {
               model: this.sequelize.models.podcast,

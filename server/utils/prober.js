@@ -84,6 +84,7 @@ function parseMediaStreamInfo(stream, all_streams, total_bit_rate) {
   var info = {
     index: stream.index,
     type: stream.codec_type,
+    attached_pic: stream.disposition?.attached_pic === 1 || stream.disposition?.attached_pic === '1',
     codec: stream.codec_name || null,
     codec_long: stream.codec_long_name || null,
     codec_time_base: stream.codec_time_base || null,
@@ -255,7 +256,8 @@ function parseProbeData(data, verbose = false) {
     }
 
     const cleaned_streams = streams.map((s) => parseMediaStreamInfo(s, streams, cleanedData.bit_rate))
-    cleanedData.video_stream = cleaned_streams.find((s) => s.type === 'video')
+    cleanedData.cover_stream = cleaned_streams.find((s) => s.type === 'video' && s.attached_pic)
+    cleanedData.video_stream = cleaned_streams.find((s) => s.type === 'video' && !s.attached_pic)
     const audioStreams = cleaned_streams.filter((s) => s.type === 'audio')
     cleanedData.audio_stream = getDefaultAudioStream(audioStreams)
 
@@ -328,12 +330,12 @@ module.exports.probe = probe
  * @param {string} filepath
  * @returns {Object} ffprobe json output
  */
-function rawProbe(filepath) {
+function rawProbe(filepath, options) {
   if (process.env.FFPROBE_PATH) {
     ffprobe.FFPROBE_PATH = process.env.FFPROBE_PATH
   }
 
-  return ffprobe(filepath).catch((err) => {
+  return ffprobe(filepath, options).catch((err) => {
     return {
       error: err
     }

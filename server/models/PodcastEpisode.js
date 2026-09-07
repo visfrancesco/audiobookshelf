@@ -1,4 +1,5 @@
 const { DataTypes, Model } = require('sequelize')
+const { publicVideoSource } = require('../utils/videoPodcastUtils')
 const libraryItemsPodcastFilters = require('../utils/queries/libraryItemsPodcastFilters')
 /**
  * @typedef ChapterObject
@@ -116,12 +117,14 @@ class PodcastEpisode extends Model {
         publishedAt: DataTypes.DATE,
 
         audioFile: DataTypes.JSON,
+        videoSource: DataTypes.JSON,
         chapters: DataTypes.JSON,
         extraData: DataTypes.JSON
       },
       {
         sequelize,
         modelName: 'podcastEpisode',
+        defaultScope: { where: { videoSource: null } },
         indexes: [
           {
             name: 'podcastEpisode_createdAt_podcastId',
@@ -141,6 +144,9 @@ class PodcastEpisode extends Model {
     })
     PodcastEpisode.belongsTo(podcast)
 
+    PodcastEpisode.addHook('beforeDestroy', async (instance) => {
+      if (instance.videoSource) await require('../managers/VideoPodcastManager').excludeEpisode(instance.id)
+    })
     PodcastEpisode.addHook('afterDestroy', async (instance) => {
       libraryItemsPodcastFilters.clearCountCache('podcastEpisode', 'afterDestroy')
     })
@@ -151,11 +157,11 @@ class PodcastEpisode extends Model {
   }
 
   get size() {
-    return this.audioFile?.metadata.size || 0
+    return this.videoSource?.size || this.audioFile?.metadata.size || 0
   }
 
   get duration() {
-    return this.audioFile?.duration || 0
+    return this.videoSource?.duration || this.audioFile?.duration || 0
   }
 
   /**
@@ -182,6 +188,7 @@ class PodcastEpisode extends Model {
    * @returns {import('./Book').AudioTrack}
    */
   getAudioTrack(libraryItemId) {
+    if (!this.audioFile) return null
     const track = structuredClone(this.audioFile)
     track.startOffset = 0
     track.title = this.audioFile.metadata.filename
@@ -221,6 +228,7 @@ class PodcastEpisode extends Model {
       pubDate: this.pubDate,
       chapters: structuredClone(this.chapters),
       audioFile: structuredClone(this.audioFile),
+      videoSource: publicVideoSource(this.videoSource),
       publishedAt: this.publishedAt?.valueOf() || null,
       addedAt: this.createdAt.valueOf(),
       updatedAt: this.updatedAt.valueOf()

@@ -170,6 +170,7 @@ class Server {
     }
 
     await Database.init(false)
+    await require('./managers/VideoPodcastManager').init(this.playbackSessionManager)
 
     if (typeof global.RouterBasePath !== 'string') {
       throw new Error('[Server] RouterBasePath must be a string before serving requests')
@@ -494,7 +495,8 @@ class Server {
           attributes: ['id']
         },
         {
-          model: Database.podcastEpisodeModel,
+          model: Database.podcastEpisodeModel.unscoped(),
+          required: false,
           attributes: ['id']
         }
       ]
@@ -541,6 +543,8 @@ class Server {
    */
   async stop() {
     Logger.info('=== Stopping Server ===')
+    await require('./managers/VideoPodcastManager').stop()
+    for (const session of [...this.playbackSessionManager.sessions]) await this.playbackSessionManager.removeSession(session.id)
     Watcher.close()
     Logger.info('[Server] Watcher Closed')
     await SocketAuthority.close()

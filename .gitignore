@@ -1,6 +1,7 @@
 .env
 /dev.js
 **/node_modules/
+**/__pycache__/
 /config/
 /audiobooks/
 /audiobooks2/

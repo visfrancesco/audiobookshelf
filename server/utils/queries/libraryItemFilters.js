@@ -57,7 +57,8 @@ module.exports = {
           model: Database.libraryItemModel
         },
         {
-          model: Database.podcastEpisodeModel
+          model: Database.podcastEpisodeModel,
+          required: false
         }
       ]
     })
@@ -118,7 +119,8 @@ module.exports = {
           model: Database.libraryItemModel
         },
         {
-          model: Database.podcastEpisodeModel
+          model: Database.podcastEpisodeModel,
+          required: false
         }
       ]
     })

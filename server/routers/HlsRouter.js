@@ -71,6 +71,22 @@ class HlsRouter {
       return res.sendStatus(400)
     }
 
+    if (stream.ensureSegment) {
+      try {
+        await require('../managers/VideoPodcastManager').validateSource(stream.episode, 'audio')
+        if (fileExt === '.ts') await stream.ensureSegment(req.params.file)
+        else if (req.params.file !== 'output.m3u8') return res.sendStatus(404)
+        await require('../managers/VideoPodcastManager').validateSource(stream.episode, 'audio')
+        const session = this.playbackSessionManager.getSession(streamId)
+        if (!session || stream.closed) return res.sendStatus(410)
+        session.updatedAt = Date.now()
+        res.set('Cache-Control', 'private, no-store')
+        return res.sendFile(fullFilePath)
+      } catch (error) {
+        return res.status(error.status || 503).json({ error: error.message })
+      }
+    }
+
     if (!(await fs.pathExists(fullFilePath))) {
       Logger.warn('File path does not exist', fullFilePath)
 

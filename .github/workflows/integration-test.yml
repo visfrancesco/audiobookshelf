@@ -43,10 +43,21 @@ jobs:
       - name: build binary
         run: pkg -t node20-linux-x64 -o audiobookshelf .
 
-      - name: run audiobookshelf
+      - name: run binary and wait for readiness
         run: |
-          ./audiobookshelf &
-          sleep 5
-
-      - name: test if server is available
-        run: curl -sf http://127.0.0.1:3333 | grep Audiobookshelf
+          ./audiobookshelf > /tmp/abs-startup.log 2>&1 &
+          abs_pid=$!
+          trap 'kill "$abs_pid" 2>/dev/null || true' EXIT
+          # First startup downloads media/SQLite binaries before opening the port.
+          for attempt in $(seq 1 60); do
+            if ! kill -0 "$abs_pid" 2>/dev/null; then
+              cat /tmp/abs-startup.log
+              exit 1
+            fi
+            if curl -fsS --max-time 3 http://127.0.0.1:3333 -o /tmp/abs-index.html 2>/dev/null && grep -q Audiobookshelf /tmp/abs-index.html; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/abs-startup.log
+          exit 1

@@ -328,6 +328,7 @@ class Database {
     require('./models/Book').init(this.sequelize)
     require('./models/Podcast').init(this.sequelize)
     require('./models/PodcastEpisode').init(this.sequelize)
+    require('./models/VideoImport').init(this.sequelize)
     require('./models/LibraryItem').init(this.sequelize)
     require('./models/MediaProgress').init(this.sequelize)
     require('./models/Series').init(this.sequelize)
@@ -729,7 +730,8 @@ class Database {
           attributes: ['id']
         },
         {
-          model: this.podcastEpisodeModel,
+          model: this.podcastEpisodeModel.unscoped(),
+          required: false,
           attributes: ['id']
         }
       ],

@@ -1,82 +1,114 @@
----
-name: Build and Push Docker Image
+name: Build and Publish Fork Image
 
 on:
-  # Allows you to run workflow manually from Actions tab
   workflow_dispatch:
-    inputs:
-      tags:
-        description: 'Docker Tag'
-        required: true
-        default: 'latest'
-  push:
-    branches: [main, master]
-    tags:
-      - 'v*.*.*'
-    # Only build when files in these directories have been changed
+  pull_request:
     paths:
-      - client/**
-      - server/**
-      - index.js
-      - package.json
+      - 'client/**'
+      - 'server/**'
+      - 'test/**'
+      - 'tools/**'
+      - 'index.js'
+      - 'package*.json'
+      - 'Dockerfile'
+      - '.dockerignore'
+      - '.github/workflows/docker-build.yml'
+  push:
+    branches: [master]
+    tags: ['v*-vfh.*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fork-image-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  build:
-    if: ${{ !contains(github.event.head_commit.message, 'skip ci') && github.repository == 'advplyr/audiobookshelf' }}
+  validate:
+    name: Test server and container
     runs-on: ubuntu-24.04
-
+    timeout-minutes: 30
     steps:
-      - name: Check out
-        uses: actions/checkout@v4
-
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          images: advplyr/audiobookshelf,ghcr.io/${{ github.repository_owner }}/audiobookshelf
-          tags: |
-            type=edge,branch=master
-            type=semver,pattern={{version}}
-
-      - name: Setup QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Cache Docker layers
-        uses: actions/cache@v4
+          node-version: 20
+          cache: npm
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          npm ci
+      - name: Test server and lifecycle adapter
+        run: |
+          npm test
+          python3 -B -m unittest discover -s test/tools -v
+      - uses: docker/setup-buildx-action@v3
+      - name: Build test image
+        uses: docker/build-push-action@v6
         with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: abs-review:${{ github.sha }}
+          cache-from: type=gha,scope=fork-amd64
+          cache-to: type=gha,mode=max,scope=fork-amd64
+      - name: Test container startup and persistence
+        run: |
+          python3 tools/test-release-image.py abs-review:${{ github.sha }}
+          python3 tools/test-release-image.py abs-review:${{ github.sha }} --upgrade-from ghcr.io/advplyr/audiobookshelf:2.36.0@sha256:180acad33d69c99ed208676465d8edcb268fa46967735579a7810859885b1a8e
 
-      - name: Login to Dockerhub
-        uses: docker/login-action@v3
+  publish:
+    name: Publish versioned amd64 and arm64 images
+    needs: validate
+    if: github.repository == 'visfrancesco/audiobookshelf' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
-
-      - name: Login to ghcr
+          fetch-depth: 0
+      - name: Validate release tag and merged commit
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-vfh\.[0-9]+$ ]]
+          test "${BASH_REMATCH[1]}" = "$(node -p 'require("./package.json").version')"
+          git merge-base --is-ancestor HEAD origin/master
+          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}:${RELEASE_TAG#v}" >> "$GITHUB_ENV"
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GHCR_PASSWORD }}
-
-      - name: Build image
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and publish immutable release reference
+        id: publish
         uses: docker/build-push-action@v6
         with:
-          tags: ${{ github.event.inputs.tags || steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
-
-      - name: Move cache
+          tags: ${{ env.IMAGE }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ github.ref_name }}
+          cache-from: type=gha,scope=fork-amd64
+      - name: Record deployment reference
+        env:
+          IMAGE_DIGEST: ${{ steps.publish.outputs.digest }}
         run: |
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+          printf '%s@%s\n' "$IMAGE" "$IMAGE_DIGEST" > image-reference.txt
+          cat image-reference.txt >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-image-reference
+          path: image-reference.txt
