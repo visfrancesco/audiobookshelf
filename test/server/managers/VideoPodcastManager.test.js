@@ -194,4 +194,50 @@ describe('Video podcast import and compatibility', function () {
       expect(await db.getQueryInterface().tableExists('videoImports')).to.equal(true)
     } finally { await db.close() }
   })
+
+  it('starts after a mapped podcast is removed and keeps remaining mappings', async () => {
+    const previousConfig = process.env.VIDEO_PODCAST_CONFIG
+    const inbox = await fs.mkdtemp(Path.join(os.tmpdir(), 'abs-inbox-test-'))
+    const configPath = Path.join(directory, 'video-podcasts.json')
+    const restarted = new VideoPodcastManager()
+    try {
+      await fs.writeFile(configPath, JSON.stringify({ enabled: true, mediaRoot: directory, inbox, sources: [
+        { sourceId: 'removed-source', libraryItemId: 'missing-podcast' },
+        ...manager.config.sources
+      ] }))
+      process.env.VIDEO_PODCAST_CONFIG = configPath
+      await restarted.init()
+      expect(restarted.config.sources.map(s => s.sourceId)).to.deep.equal(['source'])
+    } finally {
+      await restarted.stop()
+      if (previousConfig === undefined) delete process.env.VIDEO_PODCAST_CONFIG
+      else process.env.VIDEO_PODCAST_CONFIG = previousConfig
+      await fs.rm(inbox, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects playback when the source mapping is moved to another podcast', async () => {
+    const record = await manager.enqueue(manifest)
+    await manager.importRecord(record)
+    const episode = await Database.podcastEpisodeModel.unscoped().findByPk(record.episodeId)
+    const originalTarget = manager.config.sources[0].libraryItemId
+    manager.config.sources[0].libraryItemId = 'removed-target'
+    try {
+      await manager.validateSource(episode, 'audio')
+      throw new Error('accepted disabled target')
+    } catch (error) { expect(error.status).to.equal(503) }
+    finally { manager.config.sources[0].libraryItemId = originalTarget }
+  })
+
+  it('marks failed replacements unavailable instead of advertising stale playback', async () => {
+    const record = await manager.enqueue(manifest)
+    await manager.importRecord(record)
+    await fs.writeFile(Path.join(directory, 'invalid-replacement.mp4'), 'incomplete video')
+    const replacement = await manager.enqueue({ ...manifest, relativePath: 'invalid-replacement.mp4' })
+    try { await manager.importRecord(replacement); throw new Error('accepted invalid media') }
+    catch (error) { expect(error.message).to.include('probe') }
+    const episode = await Database.podcastEpisodeModel.unscoped().findByPk(record.episodeId)
+    expect(episode.videoSource.available).to.equal(false)
+    expect(replacement.state).to.equal('failed')
+  })
 })

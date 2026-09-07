@@ -40,7 +40,7 @@ class VideoAudioStream extends EventEmitter {
 
   async ensureSegment(filename) {
     this.lastAccess = Date.now()
-    const match = /^output-(\d+)\.ts$/.exec(filename)
+    const match = /^output-(0|[1-9]\d*)\.ts$/.exec(filename)
     if (!match || Number(match[1]) >= Math.ceil(this.episode.duration / 6)) throw playbackError('Unknown audio segment', 404)
     if (this.closed) throw playbackError('Playback session closed', 410)
     const output = Path.join(this.streamPath, filename)

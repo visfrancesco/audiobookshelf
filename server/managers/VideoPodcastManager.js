@@ -47,14 +47,19 @@ class VideoPodcastManager {
       if (config[key] !== undefined && (!Number.isSafeInteger(config[key]) || config[key] <= 0)) throw new Error(`Video ${key} must be a positive integer`)
     }
     const ids = new Set()
+    const activeSources = []
     for (const source of config.sources) {
       if (!source.sourceId || ids.has(source.sourceId) || !source.libraryItemId) throw new Error('Video source mappings need unique sourceId and a target libraryItemId')
       ids.add(source.sourceId)
       const item = await Database.libraryItemModel.getExpandedById(source.libraryItemId)
-      if (!item?.isPodcast) throw new Error(`Video source ${source.sourceId} must target an existing podcast`)
+      // Removing a mapped podcast must not prevent the entire server restarting.
+      if (!item) { Logger.warn(`[VideoPodcasts] Source ${source.sourceId}: target podcast was removed; mapping disabled`); continue }
+      if (!item.isPodcast) throw new Error(`Video source ${source.sourceId} must target a podcast`)
       if (item.media.autoDownloadEpisodes) throw new Error(`Disable RSS automatic downloads for video source ${source.sourceId}`)
       if (item.path && overlapsMedia(await fs.realpath(item.path))) throw new Error('Target podcast directories must be separate from Pinchflat originals')
+      activeSources.push(source)
     }
+    config.sources = activeSources
     this.config = config
     this.budget = new AudioStreamBudget(Math.max(1, Math.min(8, config.concurrency || 2)), Math.max(1024 ** 2, config.maxStreamBytes || 4 * 1024 ** 3))
     await this.records.update({ state: 'queued' }, { where: { state: 'processing' } })
@@ -145,14 +150,17 @@ class VideoPodcastManager {
       return
     }
     const file = await containedFile(this.config.mediaRoot, manifest.relativePath)
-    if (manifest.expectedSize && Number(manifest.expectedSize) !== file.stat.size) throw new Error('Completed file size does not match the manifest')
     const revision = revisionFor(file.stat)
+    if (episode && episode.videoSource?.revision !== revision) {
+      await this.closeEpisodeSessions(episode.id)
+      await episode.update({ videoSource: { ...episode.videoSource, available: false } })
+    }
+    if (manifest.expectedSize && Number(manifest.expectedSize) !== file.stat.size) throw new Error('Completed file size does not match the manifest')
     if (episode?.videoSource?.revision === revision) {
       await episode.update({ videoSource: { ...episode.videoSource, available: true } })
       await record.update({ state: 'ready', error: null, retryAt: null })
       return
     }
-    if (episode) await this.closeEpisodeSessions(episode.id)
     const raw = await rawProbe(file.path, { timeout: 30000, maxOutputBytes: 16 * 1024 ** 2 })
     const description = describeVideo(raw)
     const after = await fs.stat(file.path)
@@ -196,7 +204,9 @@ class VideoPodcastManager {
     if (!this.enabled) throw playbackError('Video podcasts are disabled', 503)
     const source = episode.videoSource
     if (!source || source.available === false) throw playbackError('The original video is unavailable', 404)
-    if (!this.config.sources.some(s => s.sourceId === source.sourceId)) throw playbackError('Video source mapping is disabled', 503)
+    const mapping = this.config.sources.find(s => s.sourceId === source.sourceId)
+    const target = mapping && await Database.libraryItemModel.findByPk(mapping.libraryItemId, { attributes: ['mediaId'] })
+    if (!target || target.mediaId !== episode.podcastId) throw playbackError('Video source mapping is disabled for this podcast', 503)
     let file
     try { file = await containedFile(this.config.mediaRoot, source.relativePath) } catch (_) { throw playbackError('The original video is unavailable', 404) }
     if (revisionFor(file.stat) !== source.revision) throw playbackError('The original changed; wait for reimport before resuming', 409)

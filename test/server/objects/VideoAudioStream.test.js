@@ -63,4 +63,13 @@ describe('Video podcast media', function () {
     expect(budget.active).to.equal(0)
     await stream.close()
   })
+
+  it('rejects alternate spellings that would duplicate cached segments', async () => {
+    const stream = new VideoAudioStream('session-canonical', directory, { duration: descriptor.duration, videoSource: descriptor }, media, new AudioStreamBudget())
+    for (const filename of ['output-00.ts', 'output-01.ts', 'output--1.ts']) {
+      try { await stream.ensureSegment(filename); throw new Error('accepted noncanonical segment') }
+      catch (error) { expect(error.status).to.equal(404) }
+    }
+    await stream.close()
+  })
 })
