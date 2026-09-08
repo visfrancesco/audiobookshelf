@@ -36,7 +36,7 @@ module.exports = {
     if (mediaType === 'book') {
       return libraryItemsBookFilters.getFilteredLibraryItems(libraryId, user, filterGroup, filterValue, sortBy, sortDesc, collapseseries, include, limit, offset)
     } else {
-      return libraryItemsPodcastFilters.getFilteredLibraryItems(libraryId, user, filterGroup, filterValue, sortBy, sortDesc, include, limit, offset)
+      return libraryItemsPodcastFilters.getFilteredLibraryItems(libraryId, user, filterGroup, filterValue, sortBy, sortDesc, include, limit, offset, options.includeVideoEpisodes)
     }
   },
 
@@ -48,7 +48,7 @@ module.exports = {
    * @param {number} limit
    * @returns {Promise<{ items:import('../../models/LibraryItem')[], count:number }>}
    */
-  async getMediaItemsInProgress(library, user, include, limit) {
+  async getMediaItemsInProgress(library, user, include, limit, includeVideoEpisodes = false) {
     if (library.isBook) {
       const { libraryItems, count } = await libraryItemsBookFilters.getFilteredLibraryItems(library.id, user, 'progress', 'in-progress', 'progress', true, false, include, limit, 0, true)
       return {
@@ -65,7 +65,7 @@ module.exports = {
         count
       }
     } else {
-      const { libraryItems, count } = await libraryItemsPodcastFilters.getFilteredPodcastEpisodes(library.id, user, 'progress', 'in-progress', 'progress', true, limit, 0, true)
+      const { libraryItems, count } = await libraryItemsPodcastFilters.getFilteredPodcastEpisodes(library.id, user, 'progress', 'in-progress', 'progress', true, limit, 0, true, includeVideoEpisodes)
       return {
         count,
         items: libraryItems.map((li) => {
@@ -85,7 +85,7 @@ module.exports = {
    * @param {number} limit
    * @returns {object} { libraryItems:LibraryItem[], count:number }
    */
-  async getLibraryItemsMostRecentlyAdded(library, user, include, limit) {
+  async getLibraryItemsMostRecentlyAdded(library, user, include, limit, includeVideoEpisodes = false) {
     if (library.isBook) {
       const { libraryItems, count } = await libraryItemsBookFilters.getFilteredLibraryItems(library.id, user, 'recent', null, 'addedAt', true, false, include, limit, 0)
       return {
@@ -105,7 +105,7 @@ module.exports = {
         count
       }
     } else {
-      const { libraryItems, count } = await libraryItemsPodcastFilters.getFilteredLibraryItems(library.id, user, 'recent', null, 'addedAt', true, include, limit, 0)
+      const { libraryItems, count } = await libraryItemsPodcastFilters.getFilteredLibraryItems(library.id, user, 'recent', null, 'addedAt', true, include, limit, 0, includeVideoEpisodes)
       return {
         libraryItems: libraryItems.map((li) => {
           const oldLibraryItem = li.toOldJSONMinified()
@@ -162,7 +162,7 @@ module.exports = {
    * @param {number} limit
    * @returns {Promise<{ items:oldLibraryItem[], count:number }>}
    */
-  async getMediaFinished(library, user, include, limit) {
+  async getMediaFinished(library, user, include, limit, includeVideoEpisodes = false) {
     if (library.isBook) {
       const { libraryItems, count } = await libraryItemsBookFilters.getFilteredLibraryItems(library.id, user, 'progress', 'finished', 'progress', true, false, include, limit, 0)
       return {
@@ -179,7 +179,7 @@ module.exports = {
         count
       }
     } else {
-      const { libraryItems, count } = await libraryItemsPodcastFilters.getFilteredPodcastEpisodes(library.id, user, 'progress', 'finished', 'progress', true, limit, 0)
+      const { libraryItems, count } = await libraryItemsPodcastFilters.getFilteredPodcastEpisodes(library.id, user, 'progress', 'finished', 'progress', true, limit, 0, false, includeVideoEpisodes)
       return {
         count,
         items: libraryItems.map((li) => {
@@ -396,10 +396,10 @@ module.exports = {
    * @param {number} limit
    * @returns {Promise<{libraryItems:oldLibraryItem[], count:number}>}
    */
-  async getNewestPodcastEpisodes(library, user, limit) {
+  async getNewestPodcastEpisodes(library, user, limit, includeVideoEpisodes = false) {
     if (library.mediaType !== 'podcast') return { libraryItems: [], count: 0 }
 
-    const { libraryItems, count } = await libraryItemsPodcastFilters.getFilteredPodcastEpisodes(library.id, user, 'recent', null, 'createdAt', true, limit, 0)
+    const { libraryItems, count } = await libraryItemsPodcastFilters.getFilteredPodcastEpisodes(library.id, user, 'recent', null, 'createdAt', true, limit, 0, false, includeVideoEpisodes)
     return {
       count,
       libraryItems: libraryItems.map((li) => {

@@ -180,11 +180,11 @@ module.exports = {
    * @param {number} limit
    * @returns {{book:object[], narrators:object[], authors:object[], tags:object[], series:object[], podcast:object[]}}
    */
-  search(user, library, query, limit) {
+  search(user, library, query, limit, includeVideoEpisodes = false) {
     if (library.isBook) {
       return libraryItemsBookFilters.search(user, library, query, limit, 0)
     } else {
-      return libraryItemsPodcastFilters.search(user, library, query, limit, 0)
+      return libraryItemsPodcastFilters.search(user, library, query, limit, 0, includeVideoEpisodes)
     }
   },
 

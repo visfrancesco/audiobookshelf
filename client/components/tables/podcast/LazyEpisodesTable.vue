@@ -94,7 +94,7 @@ export default {
   computed: {
     contextMenuItems() {
       const menuItems = []
-      if (this.userIsAdminOrUp) {
+      if (this.userIsAdminOrUp && !this.episodesCopy.some(episode => episode.videoSource)) {
         menuItems.push({
           text: this.$strings.MessageQuickMatchAllEpisodes,
           action: 'quick-match-episodes'
@@ -330,7 +330,7 @@ export default {
         title: episode.title,
         subtitle: this.mediaMetadata.title,
         caption: episode.publishedAt ? this.$getString('LabelPublishedDate', [this.$formatDate(episode.publishedAt, this.dateFormat)]) : this.$strings.LabelUnknownPublishDate,
-        duration: episode.audioFile.duration || null,
+        duration: episode.duration || episode.audioFile?.duration || null,
         coverPath: this.media.coverPath || null
       }
       this.$store.commit('addItemToQueue', queueItem)
@@ -407,7 +407,7 @@ export default {
             title: _episode.title,
             subtitle: this.mediaMetadata.title,
             caption: _episode.publishedAt ? this.$getString('LabelPublishedDate', [this.$formatDate(_episode.publishedAt, this.dateFormat)]) : this.$strings.LabelUnknownPublishDate,
-            duration: _episode.audioFile.duration || null,
+            duration: _episode.duration || episode.audioFile?.duration || null,
             coverPath: this.media.coverPath || null
           })
         }

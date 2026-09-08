@@ -77,3 +77,22 @@ AudioAtlas additionally requires `swift test` and Xcode build/UI tests on macOS,
 ### Current verification evidence
 
 On this branch the server suite passes with generated FFmpeg media, including HTTP range requests, native HLS playlist/segment requests without sockets, source revision rejection, session revocation, import ordering, migration, independent episode progress/bookmarks and legacy serialization. Lifecycle adapter tests pass. AudioAtlas core tests pass in an isolated Linux harness; native iOS build and device acceptance remain pending on macOS/Xcode. No real Pinchflat installation or physical phone was available in this environment.
+
+## Web interface
+
+The web client opts into `includeVideoEpisodes=1`. Video episodes appear in podcast details, Home shelves, search, playlists, library counts and statistics. Books and Podcasts remain the two library types: video is an episode format inside Podcasts, not a separate library type. The library editor explains why scanning the Pinchflat originals is not an import operation.
+
+Select **Listen** for an audio-only HLS stream or **Watch** for the original supported MP4. The player offers both modes and fullscreen. Switching keeps the episode position, playback speed, volume, paused/playing intent and active sleep timer. Unsupported or missing sources disable Watch and expose the reason in episode details. Casting video podcasts is not supported; disconnect casting before starting them in the browser.
+
+Administrators can open **Settings → Video imports** to inspect the latest 200 import records and errors, and refresh their status. Source mappings remain in the server configuration. Removing an imported episode excludes future automatic re-import and preserves the original Pinchflat file. RSS matching and physical-file deletion controls are excluded for imported videos.
+
+### Web verification
+
+1. Enable the importer and complete a video import, then reload the updated web client.
+2. Open its Podcasts library: confirm the episode count, recent episode shelf, and title search include it.
+3. Start Watch, seek into the episode, pause, then choose Listen. Verify position and paused state; repeat while playing and with a changed speed and sleep timer.
+4. Open fullscreen, return to the player, and close it. Reopen the same episode and confirm saved progress.
+5. Add the video to a playlist and reopen the playlist. Check that its episode can play.
+6. Inspect Video imports as an administrator and verify that a regular user cannot access its API.
+
+Automated checks: `npm test`, `ROUTER_BASE_PATH='' npm run generate --prefix client`, and the focused Cypress component spec `client/cypress/tests/components/video-podcast.cy.js` (after `npm run compile-tailwind --prefix client`). Browser autoplay may require pressing Play after a mode switch. Background playback policies depend on the browser; the web client does not promise AudioAtlas's automatic Watch-to-Listen transition on device lock.

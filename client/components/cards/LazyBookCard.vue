@@ -871,7 +871,7 @@ export default {
           title: this.recentEpisode.title,
           subtitle: this.mediaMetadata.title,
           caption: this.recentEpisode.publishedAt ? this.$getString('LabelPublishedDate', [this.$formatDate(this.recentEpisode.publishedAt, this.dateFormat)]) : this.$strings.LabelUnknownPublishDate,
-          duration: this.recentEpisode.audioFile.duration || null,
+          duration: this.recentEpisode.duration || this.recentEpisode.audioFile?.duration || null,
           coverPath: this.media.coverPath || null
         }
       } else {
@@ -1031,7 +1031,7 @@ export default {
                   title: episode.title,
                   subtitle: this.mediaMetadata.title,
                   caption: episode.publishedAt ? this.$getString('LabelPublishedDate', [this.$formatDate(episode.publishedAt, this.dateFormat)]) : this.$strings.LabelUnknownPublishDate,
-                  duration: episode.audioFile.duration || null,
+                  duration: episode.duration || episode.audioFile?.duration || null,
                   coverPath: this.media.coverPath || null
                 })
               }

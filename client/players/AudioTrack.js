@@ -10,7 +10,7 @@ export default class AudioTrack {
 
     this.sessionId = sessionId
     this.routerBasePath = routerBasePath || ''
-    if (this.contentUrl?.startsWith('/hls')) {
+    if ((this.contentUrl?.startsWith('/hls') || this.contentUrl === `/public/session/${sessionId}/video`)) {
       this.sessionTrackUrl = this.contentUrl
     } else {
       this.sessionTrackUrl = `/public/session/${sessionId}/track/${this.index}`

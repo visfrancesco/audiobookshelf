@@ -106,6 +106,11 @@ export default {
           path: '/config/item-metadata-utils'
         },
         {
+          id: 'config-video-imports',
+          title: this.$strings.HeaderVideoImports,
+          path: '/config/video-imports'
+        },
+        {
           id: 'config-rss-feeds',
           title: this.$strings.HeaderRSSFeeds,
           path: '/config/rss-feeds'

@@ -61,6 +61,40 @@ describe('Video podcast import and compatibility', function () {
     expect(expanded.media.checkCanDirectPlay(['audio/mp4'], episode.id)).to.equal(false)
   })
 
+  it('includes video in web shelves and counts without changing legacy queries', async () => {
+    const queries = require('../../../server/utils/queries/libraryItemsPodcastFilters')
+    const user = { id: 'web-test', canAccessExplicitContent: true, permissions: { accessAllTags: true }, mediaProgresses: [] }
+    const library = { id: item.libraryId }
+    const legacy = await queries.getFilteredPodcastEpisodes(item.libraryId, user, null, null, 'createdAt', true, 10, 0)
+    const web = await queries.getFilteredPodcastEpisodes(item.libraryId, user, null, null, 'createdAt', true, 10, 0, false, true)
+    expect(legacy.count).to.equal(0)
+    expect(web.count).to.equal(1)
+    expect(web.libraryItems[0].recentEpisode.duration).to.be.greaterThan(0)
+    expect(web.libraryItems[0].recentEpisode.videoSource.watchAvailable).to.equal(true)
+    expect((await queries.getRecentEpisodes(user, library, 10, 0)).length).to.equal(0)
+    expect((await queries.getRecentEpisodes(user, library, 10, 0, true)).length).to.equal(1)
+    const webItems = await queries.getFilteredLibraryItems(item.libraryId, user, null, null, null, false, [], 10, 0, true)
+    expect(webItems.libraryItems[0].media.numEpisodes).to.equal(1)
+    const legacyAgain = await queries.getFilteredPodcastEpisodes(item.libraryId, user, null, null, 'createdAt', true, 10, 0)
+    expect(legacyAgain.count).to.equal(0)
+  })
+
+  it('expands video playlists for the web and safely omits them for legacy clients', async () => {
+    const user = await Database.userModel.create({ username: 'playlist-test', type: 'user' })
+    const playlist = await Database.playlistModel.create({ name: 'Watch later', libraryId: item.libraryId, userId: user.id })
+    const episode = await Database.podcastEpisodeModel.unscoped().findOne({ where: { podcastId: item.mediaId } })
+    await Database.playlistMediaItemModel.create({ playlistId: playlist.id, mediaItemId: episode.id, mediaItemType: 'podcastEpisode', order: 0 })
+    const legacy = await Database.playlistModel.getOldPlaylistsForUserAndLibrary(user.id, item.libraryId)
+    const web = await Database.playlistModel.getOldPlaylistsForUserAndLibrary(user.id, item.libraryId, true)
+    expect(legacy[0].items).to.deep.equal([])
+    expect(web[0].items[0].episode.videoSource.watchAvailable).to.equal(true)
+    const stats = await require('../../../server/utils/queries/libraryItemsPodcastFilters').getPodcastLibraryStats(item.libraryId, true)
+    expect(stats.numAudioFiles).to.equal(1)
+    expect(stats.totalDuration).to.be.greaterThan(0)
+    await playlist.destroy()
+    await user.destroy()
+  })
+
   it('deduplicates repeated completions and preserves deletion exclusions', async () => {
     const record = await manager.enqueue(manifest)
     const id = record.episodeId

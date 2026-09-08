@@ -15,6 +15,14 @@
           <p class="text-xs text-gray-300">{{ podcastAuthor }}</p>
         </div>
       </div>
+      <div v-if="episode.videoSource" class="mb-4 p-3 border border-white/20 rounded">
+        <p>{{ $strings.LabelVideo }} · {{ episode.videoSource.width }} × {{ episode.videoSource.height }} · {{ episode.videoSource.videoCodec }} / {{ episode.videoSource.audioCodec }}</p>
+        <p v-if="episode.videoSource.watchReason" class="text-warning mt-2">{{ episode.videoSource.watchReason }}</p>
+        <div class="flex gap-2 mt-3">
+          <ui-btn :disabled="episode.videoSource.available === false" @click="playMode('audio')">{{ $strings.ButtonListen }}</ui-btn>
+          <ui-btn :disabled="!episode.videoSource.watchAvailable" @click="playMode('video')">{{ $strings.ButtonWatch }}</ui-btn>
+        </div>
+      </div>
       <p dir="auto" class="text-lg font-semibold mb-6">{{ title }}</p>
       <div v-if="description" dir="auto" class="default-style less-spacing" @click="handleDescriptionClick" v-html="description" />
       <p v-else class="mb-2">{{ $strings.MessageNoDescription }}</p>
@@ -89,10 +97,10 @@ export default {
       return this.mediaMetadata.author
     },
     audioFileFilename() {
-      return this.episode.audioFile?.metadata?.filename || ''
+      return this.episode.audioFile?.metadata?.filename || (this.episode.videoSource ? this.$strings.LabelVideo : '')
     },
     audioFileSize() {
-      const size = this.episode.audioFile?.metadata?.size || 0
+      const size = this.episode.videoSource?.size || this.episode.audioFile?.metadata?.size || 0
 
       return this.$bytesPretty(size)
     },
@@ -105,6 +113,10 @@ export default {
     }
   },
   methods: {
+    playMode(mode) {
+      this.$eventBus.$emit('play-item', { libraryItemId: this.libraryItem.id, episodeId: this.episodeId, mode })
+      this.show = false
+    },
     handleDescriptionClick(e) {
       if (e.target.matches('span.time-marker')) {
         const time = parseInt(e.target.dataset.time)

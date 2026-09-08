@@ -32,9 +32,11 @@ export default class LocalAudioPlayer extends EventEmitter {
     if (document.getElementById('audio-player')) {
       document.getElementById('audio-player').remove()
     }
-    var audioEl = document.createElement('audio')
+    var audioEl = document.createElement('video')
     audioEl.id = 'audio-player'
     audioEl.style.display = 'none'
+    audioEl.setAttribute('playsinline', '')
+    audioEl.addEventListener('fullscreenchange', () => { audioEl.controls = !!document.fullscreenElement })
     document.body.appendChild(audioEl)
     this.player = audioEl
 
@@ -120,7 +122,13 @@ export default class LocalAudioPlayer extends EventEmitter {
     }
   }
 
-  set(libraryItem, tracks, isHlsTranscode, startTime, playWhenReady = false) {
+  set(libraryItem, tracks, isHlsTranscode, startTime, playWhenReady = false, mode = 'audio') {
+    const videoHost = document.getElementById('video-player-host')
+    if (mode === 'video' && videoHost) videoHost.appendChild(this.player)
+    else document.body.appendChild(this.player)
+    this.player.style.display = mode === 'video' ? 'block' : 'none'
+    this.player.style.width = '100%'
+    this.player.style.maxHeight = '50vh'
     this.libraryItem = libraryItem
     this.audioTracks = tracks
     this.isHlsTranscode = isHlsTranscode
@@ -245,7 +253,10 @@ export default class LocalAudioPlayer extends EventEmitter {
 
   play() {
     this.playWhenReady = true
-    if (this.player) this.player.play()
+    if (this.player) this.player.play().catch(() => {
+      this.playWhenReady = false
+      this.emit('stateChange', 'PAUSED')
+    })
   }
 
   pause() {

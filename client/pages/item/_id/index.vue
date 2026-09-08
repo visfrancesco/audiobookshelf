@@ -558,7 +558,7 @@ export default {
               title: episode.title,
               subtitle: this.title,
               caption: episode.publishedAt ? this.$getString('LabelPublishedDate', [this.$formatDate(episode.publishedAt, this.dateFormat)]) : this.$strings.LabelUnknownPublishDate,
-              duration: episode.audioFile.duration || null,
+              duration: episode.duration || episode.audioFile?.duration || null,
               coverPath: this.libraryItem.media.coverPath || null
             })
           }
@@ -592,10 +592,12 @@ export default {
       if (!this.$refs.description) return
       this.isDescriptionClamped = this.$refs.description.scrollHeight > this.$refs.description.clientHeight
     },
-    libraryItemUpdated(libraryItem) {
+    async libraryItemUpdated(libraryItem) {
       if (libraryItem.id === this.libraryItemId) {
         console.log('Item was updated', libraryItem)
-        this.libraryItem = libraryItem
+        this.libraryItem = libraryItem.mediaType === 'podcast'
+          ? await this.$axios.$get(`/api/items/${libraryItem.id}?expanded=1`).catch(() => this.libraryItem)
+          : libraryItem
         this.$nextTick(this.checkDescriptionClamped)
       }
     },
