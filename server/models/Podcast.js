@@ -463,7 +463,7 @@ class Podcast extends Model {
       metadata: this.oldMetadataToJSONExpanded(),
       coverPath: this.coverPath,
       tags: [...(this.tags || [])],
-      numEpisodes: this.podcastEpisodes?.length || 0,
+      numEpisodes: this.podcastEpisodes?.length ?? this.numEpisodes ?? 0,
       autoDownloadEpisodes: this.autoDownloadEpisodes,
       autoDownloadSchedule: this.autoDownloadSchedule,
       lastEpisodeCheck: this.lastEpisodeCheck?.valueOf() || null,

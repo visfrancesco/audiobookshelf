@@ -1,5 +1,9 @@
 <template>
   <div v-if="streamLibraryItem" id="mediaPlayerContainer" class="w-full fixed bottom-0 left-0 right-0 h-48 lg:h-40 z-50 bg-primary px-2 lg:px-4 pb-1 lg:pb-4 pt-2">
+    <div v-show="playbackMode === 'video'" class="absolute bottom-full left-0 right-0 bg-black flex justify-center">
+      <button class="absolute top-2 right-2 p-2 bg-black/70 rounded" :aria-label="$strings.LabelFullscreen" @click="fullscreenVideo"><span class="material-symbols">fullscreen</span></button>
+      <div id="video-player-host" class="w-full" style="max-width: 960px" />
+    </div>
     <div class="absolute left-2 top-2 lg:left-4 cursor-pointer">
       <covers-book-cover expand-on-click :library-item="streamLibraryItem" :width="bookCoverWidth" :book-cover-aspect-ratio="coverAspectRatio" />
     </div>
@@ -24,6 +28,10 @@
           <span class="material-symbols text-xs">schedule</span>
           <p class="font-mono text-xs sm:text-sm pl-1 sm:pl-1.5 pb-px">{{ totalDurationPretty }}</p>
         </div>
+      </div>
+      <div v-if="streamEpisode && streamEpisode.videoSource" class="flex shrink-0 gap-1 items-center">
+        <button class="px-2 py-1 rounded border border-white/20" :class="playbackMode === 'audio' ? 'text-success' : ''" :aria-pressed="playbackMode === 'audio'" :disabled="playerLoading" @click="playerHandler.switchPlaybackMode('audio')">{{ $strings.ButtonListen }}</button>
+        <button class="px-2 py-1 rounded border border-white/20 disabled:opacity-50" :class="playbackMode === 'video' ? 'text-success' : ''" :aria-pressed="playbackMode === 'video'" :disabled="playerLoading || !streamEpisode.videoSource.watchAvailable" :title="streamEpisode.videoSource.watchReason" @click="playerHandler.switchPlaybackMode('video')">{{ $strings.ButtonWatch }}</button>
       </div>
       <div class="grow" />
       <ui-tooltip direction="top" :text="$strings.LabelClosePlayer">
@@ -71,6 +79,7 @@ export default {
     return {
       playerHandler: new PlayerHandler(this),
       totalDuration: 0,
+      playbackMode: 'audio',
       showBookmarksModal: false,
       bookmarkCurrentTime: 0,
       playerLoading: false,
@@ -181,6 +190,11 @@ export default {
     }
   },
   methods: {
+    fullscreenVideo() {
+      const video = this.playerHandler.player?.player
+      if (video?.requestFullscreen) video.requestFullscreen().catch(() => {})
+      else if (video?.webkitEnterFullscreen) video.webkitEnterFullscreen()
+    },
     mediaFinished(libraryItemId, episodeId) {
       // Play next item in queue
       if (!this.playerQueueItems.length || !this.$store.state.playerQueueAutoPlay) {
@@ -500,6 +514,10 @@ export default {
     async playLibraryItem(payload) {
       const libraryItemId = payload.libraryItemId
       const episodeId = payload.episodeId || null
+      if (payload.mode && payload.mode !== this.playerHandler.playbackMode && this.playerHandler.libraryItemId === libraryItemId && this.playerHandler.episodeId === episodeId) {
+        await this.playerHandler.switchPlaybackMode(payload.mode)
+        return
+      }
 
       if (this.playerHandler.libraryItemId == libraryItemId && this.playerHandler.episodeId == episodeId) {
         if (payload.startTime !== null && !isNaN(payload.startTime)) {
@@ -528,7 +546,9 @@ export default {
         if (this.$refs.audioPlayer) this.$refs.audioPlayer.checkUpdateChapterTrack()
       })
 
-      this.playerHandler.load(libraryItem, episodeId, true, this.currentPlaybackRate, payload.startTime)
+      this.playbackMode = payload.mode || 'audio'
+      await this.$nextTick()
+      this.playerHandler.load(libraryItem, episodeId, true, this.currentPlaybackRate, payload.startTime, this.playbackMode)
     },
     pauseItem() {
       this.playerHandler.pause()

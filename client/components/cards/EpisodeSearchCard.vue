@@ -3,6 +3,7 @@
     <covers-book-cover :library-item="libraryItem" :width="coverWidth" :book-cover-aspect-ratio="bookCoverAspectRatio" />
     <div class="grow px-2 episodeSearchCardContent">
       <p class="truncate text-sm">{{ episodeTitle }}</p>
+      <p v-if="episode.videoSource" class="text-xs text-success">{{ $strings.LabelVideo }}</p>
       <p class="text-xs text-gray-200 truncate">{{ podcastTitle }}</p>
     </div>
   </div>

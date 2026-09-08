@@ -22,6 +22,10 @@ export default function ({ $axios, store, $root, app }) {
     if (config.url.startsWith('http:') || config.url.startsWith('https:')) {
       return
     }
+    // This web client understands video episodes; legacy clients retain their default view.
+    if (config.url.startsWith('/api/')) {
+      config.params = { ...config.params, includeVideoEpisodes: 1 }
+    }
     const bearerToken = store.getters['user/getToken']
     if (bearerToken) {
       config.headers.common['Authorization'] = `Bearer ${bearerToken}`

@@ -327,11 +327,13 @@ export default {
       if (this.currentLibraryId !== libraryId) return
       this.$store.commit('libraries/removeSeriesFromFilterData', id)
     },
-    playlistAdded(playlist) {
+    async playlistAdded(playlist) {
+      playlist = await this.$axios.$get(`/api/playlists/${playlist.id}`).catch(() => playlist)
       if (playlist.userId !== this.user.id || this.currentLibraryId !== playlist.libraryId) return
       this.$store.commit('libraries/addUpdateUserPlaylist', playlist)
     },
-    playlistUpdated(playlist) {
+    async playlistUpdated(playlist) {
+      playlist = await this.$axios.$get(`/api/playlists/${playlist.id}`).catch(() => playlist)
       if (playlist.userId !== this.user.id || this.currentLibraryId !== playlist.libraryId) return
       this.$store.commit('libraries/addUpdateUserPlaylist', playlist)
     },

@@ -23,6 +23,8 @@ export default class PlayerHandler {
     this.listeningTimeSinceSync = 0
 
     this.playInterval = null
+    this.playbackMode = 'audio'
+    this.prepareGeneration = 0
   }
 
   get isCasting() {
@@ -56,7 +58,8 @@ export default class PlayerHandler {
     this.ctx.$store.commit('setPlaybackSessionId', sessionId)
   }
 
-  load(libraryItem, episodeId, playWhenReady, playbackRate, startTimeOverride = undefined) {
+  load(libraryItem, episodeId, playWhenReady, playbackRate, startTimeOverride = undefined, mode = 'audio') {
+    this.playbackMode = mode
     this.libraryItem = libraryItem
 
     this.episodeId = episodeId
@@ -119,6 +122,12 @@ export default class PlayerHandler {
   }
 
   playerError() {
+    if (this.episode?.videoSource) {
+      this.pause()
+      this.ctx.playerLoading = false
+      this.ctx.$toast.error(this.ctx.$strings.MessageVideoPlaybackFailed)
+      return
+    }
     // Switch to HLS stream on error
     if (!this.isCasting && this.player instanceof LocalAudioPlayer) {
       console.log(`[PlayerHandler] Audio player error switching to HLS stream`)
@@ -180,7 +189,17 @@ export default class PlayerHandler {
   }
 
   async prepare(forceTranscode = false) {
+    const generation = ++this.prepareGeneration
+    this.player.pause()
+    this.ctx.playerLoading = true
+    if (this.currentSessionId) await this.sendCloseSession()
+    if (generation !== this.prepareGeneration) return
     this.setSessionId(null) // Reset session
+    if (this.episode?.videoSource && this.isCasting) {
+      this.ctx.$toast.error(this.ctx.$strings.MessageVideoCastUnsupported)
+      this.ctx.playerLoading = false
+      return
+    }
 
     const payload = {
       deviceInfo: {
@@ -189,6 +208,8 @@ export default class PlayerHandler {
       },
       supportedMimeTypes: this.player.playableMimeTypes,
       mediaPlayer: this.isCasting ? 'chromecast' : 'html5',
+      mode: this.playbackMode,
+      startTime: this.startTimeOverride,
       forceTranscode,
       forceDirectPlay: this.isCasting // TODO: add transcode support for chromecast
     }
@@ -197,6 +218,15 @@ export default class PlayerHandler {
     const session = await this.ctx.$axios.$post(path, payload).catch((error) => {
       console.error('Failed to start stream', error)
     })
+    if (generation !== this.prepareGeneration) {
+      if (session) await this.ctx.$axios.$post(`/api/session/${session.id}/close`)
+      return
+    }
+    if (!session) {
+      this.ctx.playerLoading = false
+      this.ctx.$toast.error(this.ctx.$strings.MessageVideoPlaybackFailed)
+      return
+    }
     this.prepareSession(session)
   }
 
@@ -223,7 +253,10 @@ export default class PlayerHandler {
 
     console.log('[PlayerHandler] Preparing Session', session)
 
-    var audioTracks = session.audioTracks.map((at) => new AudioTrack(at, session.id, this.ctx.$config.routerBasePath))
+    const tracks = session.media?.mode === 'video'
+      ? [{ ...session.media, duration: session.duration || this.episode.duration, startOffset: 0 }]
+      : session.audioTracks
+    var audioTracks = tracks.map((at) => new AudioTrack(at, session.id, this.ctx.$config.routerBasePath))
 
     this.ctx.playerLoading = true
     this.isHlsTranscode = true
@@ -231,10 +264,24 @@ export default class PlayerHandler {
       this.isHlsTranscode = false
     }
 
-    this.player.set(this.libraryItem, audioTracks, this.isHlsTranscode, this.startTime, this.playWhenReady)
+    this.player.set(this.libraryItem, audioTracks, this.isHlsTranscode, this.startTime, this.playWhenReady, this.playbackMode)
 
     // browser media session api
     this.ctx.setMediaSession()
+  }
+
+  async switchPlaybackMode(mode) {
+    if (!this.episode?.videoSource || mode === this.playbackMode || this.ctx.playerLoading) return
+    if (mode === 'video' && !this.episode.videoSource.watchAvailable) return
+    this.startTimeOverride = this.getCurrentTime()
+    const resumeWhenReady = this.playerPlaying
+    this.pause()
+    this.playWhenReady = resumeWhenReady
+    this.playbackMode = mode
+    this.ctx.playbackMode = mode
+    this.ctx.playerLoading = true
+    await this.ctx.$nextTick()
+    await this.prepare()
   }
 
   closePlayer() {
@@ -244,6 +291,8 @@ export default class PlayerHandler {
   }
 
   resetPlayer() {
+    this.prepareGeneration++
+    this.ctx.playbackMode = 'audio'
     if (this.player) {
       this.player.destroy()
     }
@@ -287,6 +336,7 @@ export default class PlayerHandler {
   }
 
   sendCloseSession() {
+    if (!this.currentSessionId) return Promise.resolve()
     let syncData = null
     if (this.player) {
       const listeningTimeToAdd = Math.max(0, Math.floor(this.listeningTimeSinceSync))
@@ -336,6 +386,8 @@ export default class PlayerHandler {
   stopPlayInterval() {
     clearInterval(this.playInterval)
     this.playInterval = null
+    this.playbackMode = 'audio'
+    this.prepareGeneration = 0
   }
 
   playPause() {
@@ -347,6 +399,7 @@ export default class PlayerHandler {
   }
 
   pause() {
+    this.playWhenReady = false
     if (this.player) this.player.pause()
   }
 

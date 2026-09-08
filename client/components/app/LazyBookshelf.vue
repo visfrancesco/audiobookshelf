@@ -634,7 +634,8 @@ export default {
       console.log(`[LazyBookshelf] playlistAdded ${playlist.id}`, playlist)
       this.resetEntities()
     },
-    playlistUpdated(playlist) {
+    async playlistUpdated(playlist) {
+      playlist = await this.$axios.$get(`/api/playlists/${playlist.id}`).catch(() => playlist)
       if (this.entityName !== 'playlists') return
       console.log(`[LazyBookshelf] playlistUpdated ${playlist.id}`, playlist)
       var indexOf = this.entities.findIndex((ent) => ent && ent.id === playlist.id)

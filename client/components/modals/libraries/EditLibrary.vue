@@ -16,6 +16,7 @@
         </div>
       </div>
 
+      <p v-if="mediaType === 'podcast'" class="text-sm text-gray-300 p-2">{{ $strings.MessageVideoLibraryHelp }}</p>
       <div class="folders-container overflow-y-auto w-full py-2 mb-2">
         <p class="px-1 text-sm font-semibold">{{ $strings.LabelFolders }}</p>
         <div v-for="(folder, index) in folders" :key="index" class="w-full flex items-center py-1 px-2">

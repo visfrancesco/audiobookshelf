@@ -34,7 +34,7 @@ class Playlist extends Model {
    * @param {string} libraryId
    * @async
    */
-  static async getOldPlaylistsForUserAndLibrary(userId, libraryId) {
+  static async getOldPlaylistsForUserAndLibrary(userId, libraryId, includeVideoEpisodes = false) {
     if (!userId && !libraryId) return []
 
     const whereQuery = {}
@@ -70,7 +70,7 @@ class Playlist extends Model {
             ]
           },
           {
-            model: this.sequelize.models.podcastEpisode,
+            model: includeVideoEpisodes ? this.sequelize.models.podcastEpisode.unscoped() : this.sequelize.models.podcastEpisode,
             required: false,
             include: {
               model: this.sequelize.models.podcast,
@@ -271,7 +271,7 @@ class Playlist extends Model {
    *
    * @returns {Promise<import('./PlaylistMediaItem')[]>}
    */
-  getMediaItemsExpandedWithLibraryItem() {
+  getMediaItemsExpandedWithLibraryItem(includeVideoEpisodes = false) {
     return this.getPlaylistMediaItems({
       include: [
         {
@@ -295,7 +295,7 @@ class Playlist extends Model {
           ]
         },
         {
-          model: this.sequelize.models.podcastEpisode,
+          model: includeVideoEpisodes ? this.sequelize.models.podcastEpisode.unscoped() : this.sequelize.models.podcastEpisode,
           required: false,
           include: [
             {
@@ -353,7 +353,7 @@ class Playlist extends Model {
     }
 
     const json = this.toOldJSON()
-    json.items = this.playlistMediaItems.map((pmi) => {
+    json.items = this.playlistMediaItems.filter((pmi) => pmi.mediaItem).map((pmi) => {
       if (pmi.mediaItemType === 'book') {
         const libraryItem = pmi.mediaItem.libraryItem
         delete pmi.mediaItem.libraryItem

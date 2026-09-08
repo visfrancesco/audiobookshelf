@@ -4,6 +4,7 @@
       <div class="grow">
         <div dir="auto" class="flex items-center">
           <span class="text-sm font-semibold">{{ episodeTitle }}</span>
+          <span v-if="episode.videoSource" class="ml-2 text-xs text-success">{{ $strings.LabelVideo }}</span>
           <widgets-podcast-type-indicator :type="episodeType" />
         </div>
 
@@ -14,7 +15,7 @@
         <div class="h-8 flex items-center">
           <p v-if="sortKey === 'audioFile.metadata.filename'" class="text-sm text-gray-300 truncate font-light">
             <strong className="font-bold">{{ $strings.LabelFilename }}</strong
-            >: {{ episode.audioFile.metadata.filename }}
+            >: {{ episode.audioFile?.metadata?.filename || episode.title }}
           </p>
           <div v-else class="w-full inline-flex justify-between max-w-xl">
             <p v-if="episode?.season" class="text-sm text-gray-300">{{ $getString('LabelSeasonNumber', [episode.season]) }}</p>
@@ -25,12 +26,14 @@
         </div>
 
         <div class="flex items-center pt-2">
-          <button class="h-8 px-4 border border-white/20 hover:bg-white/10 rounded-full flex items-center justify-center cursor-pointer focus:outline-hidden" :class="userIsFinished ? 'text-white/40' : ''" @click.stop="playClick">
+          <button class="h-8 px-4 border border-white/20 hover:bg-white/10 rounded-full flex items-center justify-center cursor-pointer focus:outline-hidden" :class="userIsFinished ? 'text-white/40' : ''" :disabled="episode.videoSource && episode.videoSource.available === false" :title="episode.videoSource && episode.videoSource.available === false ? episode.videoSource.watchReason : null" @click.stop="playClick">
             <span class="material-symbols fill text-2xl" aria-hidden="true" :class="streamIsPlaying ? '' : 'text-success'">{{ streamIsPlaying ? 'pause' : 'play_arrow' }}</span>
             <span class="sr-only">{{ streamIsPlaying ? $strings.ButtonPause : $strings.ButtonPlay }}</span>
-            <p class="pl-2 pr-1 text-sm font-semibold" aria-hidden="true">{{ timeRemaining }}</p>
+            <span v-if="episode.videoSource && !streamIsPlaying" class="pl-1 text-sm">{{ $strings.ButtonListen }}</span>
+            <p class="pl-2 pr-1 text-sm font-semibold" :class="episode.videoSource ? 'hidden sm:block' : ''" aria-hidden="true">{{ timeRemaining }}</p>
           </button>
 
+          <button v-if="episode.videoSource" class="ml-2 px-3 h-8 border border-white/20 rounded-full disabled:opacity-50" :disabled="!episode.videoSource.watchAvailable" :title="episode.videoSource.watchReason" @click.stop="watchClick">{{ $strings.ButtonWatch }}</button>
           <ui-tooltip v-if="libraryItemIdStreaming && !isStreamingFromDifferentLibrary" :text="isQueued ? $strings.MessageRemoveFromPlayerQueue : $strings.MessageAddToPlayerQueue" :class="isQueued ? 'text-success' : ''" direction="top">
             <ui-icon-btn :icon="isQueued ? 'playlist_add_check' : 'playlist_play'" :aria-label="isQueued ? $strings.LabelRemoveFromPlayerQueue : $strings.LabelAddToPlayerQueue" borderless @click="queueBtnClick" />
           </ui-tooltip>
@@ -169,10 +172,17 @@ export default {
     mouseleave() {
       this.isHovering = false
     },
+    watchClick() {
+      const eventBus = this.$eventBus || this.$nuxt.$eventBus
+      eventBus.$emit('play-item', { libraryItemId: this.libraryItemId, episodeId: this.episodeId, mode: 'video' })
+    },
     playClick() {
       if (this.streamIsPlaying) {
         const eventBus = this.$eventBus || this.$nuxt.$eventBus
         eventBus.$emit('pause-item')
+      } else if (this.episode.videoSource) {
+        const eventBus = this.$eventBus || this.$nuxt.$eventBus
+        eventBus.$emit('play-item', { libraryItemId: this.libraryItemId, episodeId: this.episodeId, mode: 'audio' })
       } else {
         this.$emit('play', this.episode)
       }
