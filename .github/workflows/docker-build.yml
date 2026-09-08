@@ -163,7 +163,8 @@ jobs:
           docker buildx imagetools create --tag "$image" "$repository@$amd64_digest" "$repository@$arm64_digest"
           docker buildx imagetools inspect "$image" --raw > manifest.json
           python3 -c 'import json; m=json.load(open("manifest.json")); platforms={(i["platform"]["os"],i["platform"]["architecture"]) for i in m["manifests"]}; assert {("linux","amd64"),("linux","arm64")} <= platforms'
-          digest="$(docker buildx imagetools inspect "$image" | awk '$1 == "Digest:" {print $2; exit}')"
+          docker buildx imagetools inspect "$image" > image-inspect.txt
+          digest="$(awk '$1 == "Digest:" {print $2; exit}' image-inspect.txt)"
           [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
           printf '%s@%s\n' "$image" "$digest" > image-reference.txt
           cat image-reference.txt >> "$GITHUB_STEP_SUMMARY"

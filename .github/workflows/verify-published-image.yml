@@ -1,0 +1,42 @@
+name: Verify published fork image
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing release tag to verify and record (no image rebuild or retag)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag }}
+          fetch-depth: 0
+      - uses: docker/setup-buildx-action@v3
+      - name: Verify release ancestry and published architectures
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-vfh\.[0-9]+$ ]]
+          test "${BASH_REMATCH[1]}" = "$(node -p 'require("./package.json").version')"
+          git merge-base --is-ancestor HEAD origin/master
+          image="ghcr.io/${GITHUB_REPOSITORY,,}:${RELEASE_TAG#v}"
+          docker buildx imagetools inspect "$image" --raw > manifest.json
+          python3 -c 'import json; m=json.load(open("manifest.json")); platforms={(i["platform"]["os"],i["platform"]["architecture"]) for i in m["manifests"]}; assert {("linux","amd64"),("linux","arm64")} <= platforms'
+          docker buildx imagetools inspect "$image" > image-inspect.txt
+          digest="$(awk '$1 == "Digest:" {print $2; exit}' image-inspect.txt)"
+          [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+          printf '%s@%s\n' "$image" "$digest" > image-reference.txt
+          cat image-reference.txt >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-image-reference
+          path: image-reference.txt
