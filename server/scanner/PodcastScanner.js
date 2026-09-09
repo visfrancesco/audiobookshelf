@@ -66,7 +66,14 @@ class PodcastScanner {
       // Filter out and destroy episodes that were removed.
       // filter() returns a new array — reassign to media.podcastEpisodes before emit.
       const episodesToRemove = []
+      // KnowledgeShelf retention keeps episode/progress identity after expiring
+      // an original. Explicit episode deletion still uses the ordinary API.
+      const retained = Database.models.knowledgeAsset ? await Database.models.knowledgeAsset.findAll({
+        where: { libraryItemId: existingLibraryItem.id, available: false }, attributes: ['episodeId']
+      }) : []
+      const retainedIds = new Set(retained.map(asset => asset.episodeId))
       existingPodcastEpisodes = existingPodcastEpisodes.filter((ep) => {
+        if (retainedIds.has(ep.id)) return true
         if (libraryItemData.checkAudioFileRemoved(ep.audioFile)) {
           episodesToRemove.push(ep)
           return false

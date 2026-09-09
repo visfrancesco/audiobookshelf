@@ -145,6 +145,7 @@ class PodcastEpisode extends Model {
     PodcastEpisode.belongsTo(podcast)
 
     PodcastEpisode.addHook('beforeDestroy', async (instance) => {
+      await require('../managers/KnowledgeShelfManager').excludeEpisode(instance.id)
       if (instance.videoSource) await require('../managers/VideoPodcastManager').excludeEpisode(instance.id)
     })
     PodcastEpisode.addHook('afterDestroy', async (instance) => {

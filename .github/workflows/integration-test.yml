@@ -40,6 +40,9 @@ jobs:
       - name: get server dependencies
         run: npm ci --only=production
 
+      - name: Install document tools
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
+
       - name: build binary
         run: pkg -t node20-linux-x64 -o audiobookshelf .
 
@@ -55,6 +58,8 @@ jobs:
               exit 1
             fi
             if curl -fsS --max-time 3 http://127.0.0.1:3333 -o /tmp/abs-index.html 2>/dev/null && grep -q Audiobookshelf /tmp/abs-index.html; then
+              mkdir -p /tmp/knowledge-integration-books
+              python3 tools/knowledge_smoke.py http://127.0.0.1:3333 --library-path /tmp/knowledge-integration-books
               exit 0
             fi
             sleep 2

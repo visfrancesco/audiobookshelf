@@ -171,6 +171,7 @@ class Server {
 
     await Database.init(false)
     await require('./managers/VideoPodcastManager').init(this.playbackSessionManager)
+    await require('./managers/KnowledgeShelfManager').init()
 
     if (typeof global.RouterBasePath !== 'string') {
       throw new Error('[Server] RouterBasePath must be a string before serving requests')
@@ -321,9 +322,17 @@ class Server {
 
     this.server = http.createServer(app)
 
-    // Skip file upload parsing for internal-api routes (Next.js proxies read multipart bodies).
+    // Authenticate and bound document uploads before consuming their multipart body.
+    router.use('/api/knowledge', this.auth.ifAuthNeeded(this.authMiddleware.bind(this)), (req, res, next) => {
+      if (req.method === 'POST' && req.path === '/documents' && !req.user.isAdminOrUp && !req.user.canUpload) return res.sendStatus(403)
+      next()
+    }, fileUpload({
+      defCharset: 'utf8', defParamCharset: 'utf8', useTempFiles: true, tempFileDir: Path.join(global.MetadataPath, 'tmp'),
+      limits: { fileSize: 20 * 1024 ** 2, files: 1, fields: 12, fieldSize: 1024 * 1024 }, abortOnLimit: true
+    }))
+    // Skip upload parsing for the bounded KnowledgeShelf handler and Next.js proxies.
     router.use(
-      /^(?!\/internal-api).*/,
+      /^(?!\/internal-api|\/api\/knowledge(?:\/|$)).*/,
       fileUpload({
         defCharset: 'utf8',
         defParamCharset: 'utf8',
@@ -371,6 +380,7 @@ class Server {
       // server has been initialized if a root user exists
       const payload = {
         app: 'audiobookshelf',
+        product: 'KnowledgeShelf',
         serverVersion: version,
         isInit: Database.hasRootUser,
         language: Database.serverSettings.language,
@@ -543,6 +553,7 @@ class Server {
    */
   async stop() {
     Logger.info('=== Stopping Server ===')
+    await require('./managers/KnowledgeShelfManager').stop()
     await require('./managers/VideoPodcastManager').stop()
     for (const session of [...this.playbackSessionManager.sessions]) await this.playbackSessionManager.removeSession(session.id)
     Watcher.close()

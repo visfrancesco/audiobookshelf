@@ -10,7 +10,7 @@ RUN npm ci && npm cache clean --force
 RUN npm run generate
 
 ### STAGE 1: Build server ###
-FROM node:20-alpine AS build-server
+FROM node:22-alpine AS build-server
 
 ARG NUSQLITE3_DIR
 ARG TARGETPLATFORM
@@ -41,7 +41,7 @@ RUN case "$TARGETPLATFORM" in \
 RUN npm ci --only=production
 
 ### STAGE 2: Create minimal runtime image ###
-FROM node:20-alpine
+FROM node:22-alpine
 
 ARG NUSQLITE3_DIR
 ARG NUSQLITE3_PATH
@@ -50,7 +50,18 @@ ARG NUSQLITE3_PATH
 RUN apk add --no-cache --update \
   tzdata \
   ffmpeg \
+  python3 \
+  py3-pip \
+  poppler-utils \
   tini
+
+COPY tools/requirements-knowledge.txt /tmp/requirements-knowledge.txt
+RUN python3 -m venv /opt/knowledge-tools \
+  && /opt/knowledge-tools/bin/pip install --no-cache-dir -r /tmp/requirements-knowledge.txt \
+  && rm /tmp/requirements-knowledge.txt
+ENV PATH="/opt/knowledge-tools/bin:${PATH}"
+LABEL org.opencontainers.image.title="KnowledgeShelf"
+LABEL org.opencontainers.image.description="KnowledgeShelf audiobook, video and document narration server, based on Audiobookshelf"
 
 WORKDIR /app
 

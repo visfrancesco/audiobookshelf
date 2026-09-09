@@ -63,7 +63,9 @@ class ApiRouter {
 
   init() {
     const videoPodcasts = require('../managers/VideoPodcastManager')
-    this.router.get('/capabilities', (req, res) => res.json({ videoPodcastsV1: videoPodcasts.enabled }))
+    const knowledge = require('../managers/KnowledgeShelfManager')
+    this.router.get('/capabilities', (req, res) => res.json({ videoPodcastsV1: videoPodcasts.enabled || knowledge.ready, ...knowledge.capabilities() }))
+    this.router.use('/knowledge', require('./KnowledgeRouter')(knowledge))
     this.router.get('/video-imports', async (req, res) => {
       if (!req.user.isAdminOrUp) return res.sendStatus(403)
       try { res.json(await videoPodcasts.records.findAll({ order: [['updatedAt', 'DESC']], limit: 200 })) }

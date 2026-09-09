@@ -1,3 +1,9 @@
+# KnowledgeShelf
+
+This fork adds native YouTube sources, video podcast Listen/Watch playback and full document narration through ElevenLabs to the Audiobookshelf backend. See the [backend setup and API guide](docs/knowledgeshelf-backend.md) and [implementation sequence](docs/knowledgeshelf-implementation.md). Existing ABS libraries, APIs and AudioAtlas access remain supported. The Laravel UI rewrite follows on a separate branch.
+
+The original Audiobookshelf project documentation and attribution follow.
+
 <br />
 <div align="center">
    <img alt="Audiobookshelf Banner" src="https://github.com/advplyr/audiobookshelf/raw/master/images/banner.svg" width="600">

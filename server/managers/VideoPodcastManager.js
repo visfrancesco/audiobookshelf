@@ -201,6 +201,7 @@ class VideoPodcastManager {
   }
 
   async validateSource(episode, mode) {
+    if (episode.videoSource?.provider === 'knowledgeshelf') return require('./KnowledgeShelfManager').validateVideo(episode, mode)
     if (!this.enabled) throw playbackError('Video podcasts are disabled', 503)
     const source = episode.videoSource
     if (!source || source.available === false) throw playbackError('The original video is unavailable', 404)
