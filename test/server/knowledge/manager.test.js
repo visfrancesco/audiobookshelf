@@ -107,6 +107,42 @@ describe('KnowledgeShelf library integration', function () {
     expect(await manager.validateVideo(episode, 'video')).to.equal(path)
     expect((await asset.reload()).episodeId).to.equal(episode.id)
   })
+  it('keeps native video playlists available to opted-in clients and hidden from legacy clients', async () => {
+    const source = await manager.createSource(sourceBody, context.user)
+    await drain(manager.queue)
+    const asset = await context.models.knowledgeAsset.findOne()
+    const controller = require('../../../server/controllers/PlaylistController')
+    const app = express()
+    app.use(express.json(), (req, _, next) => { req.user = context.user; next() })
+    app.post('/playlists', controller.create.bind(controller))
+    app.get('/playlists/:id', controller.middleware.bind(controller), controller.findOne.bind(controller))
+    app.post('/playlists/:id/item', controller.middleware.bind(controller), controller.addItem.bind(controller))
+    const server = app.listen(0, '127.0.0.1')
+    await new Promise(resolve => server.once('listening', resolve))
+    const url = `http://127.0.0.1:${server.address().port}/playlists`
+    const item = { libraryItemId: source.libraryItemId, episodeId: asset.episodeId }
+    const body = { name: 'Video listens', libraryId: source.libraryId, items: [item] }
+    const post = (path, data) => fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+    try {
+      expect((await post(url, body)).status).to.equal(400)
+      const created = await post(url + '?includeVideoEpisodes=1', body)
+      expect(created.status).to.equal(200)
+      const playlist = await created.json()
+      expect(playlist.items[0].episodeId).to.equal(asset.episodeId)
+      const legacy = await (await fetch(url + '/' + playlist.id)).json()
+      expect(legacy.items).to.have.length(0)
+      const visible = await (await fetch(url + '/' + playlist.id + '?includeVideoEpisodes=1')).json()
+      expect(visible.items).to.have.length(1)
+      const libraryLists = await context.models.playlist.getOldPlaylistsForUserAndLibrary(context.user.id, source.libraryId, true)
+      expect(libraryLists[0].items).to.have.length(1)
+      const empty = await (await post(url, { ...body, items: [] })).json()
+      expect((await post(url + '/' + empty.id + '/item?includeVideoEpisodes=1', item)).status).to.equal(200)
+      const otherSource = await manager.createSource({ ...sourceBody, url: 'https://youtube.com/@another-channel' }, context.user)
+      await drain(manager.queue)
+      const mismatched = { ...body, items: [{ ...item, libraryItemId: otherSource.libraryItemId }] }
+      expect((await post(url + '?includeVideoEpisodes=1', mismatched)).status).to.equal(400)
+    } finally { await new Promise(resolve => server.close(resolve)) }
+  })
   it('adopts a Pinchflat video without changing episode, progress or bookmark identity', async () => {
     const legacy = require('../../../server/managers/VideoPodcastManager')
     const previousConfig = legacy.config

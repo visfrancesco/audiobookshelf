@@ -1,0 +1,2 @@
+@props(['libraryId', 'name' => 'libraryItemId', 'multiple' => false])
+<div data-item-picker data-library="{{ $libraryId }}" data-name="{{ $name }}" data-multiple="{{ $multiple ? 1 : 0 }}"><label class="field"><span>Find books to add</span><input type="search" placeholder="Type a title or author…" data-picker-search autocomplete="off"><small data-picker-status role="status">Enter at least two characters.</small></label><div data-picker-selected></div><div data-picker-results></div></div>

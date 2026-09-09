@@ -56,7 +56,7 @@ def main(image, upgrade_from=None):
         with urllib.request.urlopen(base + '/healthcheck', timeout=5) as response:
             assert response.status == 200
         with urllib.request.urlopen(base, timeout=5) as response:
-            assert 'Audiobookshelf' in response.read().decode()
+            assert 'KnowledgeShelf' in response.read().decode()
         for binary in ['ffmpeg', 'ffprobe']:
             docker('exec', name, binary, '-version')
         docker('exec', name, 'pdftotext', '-v')
@@ -89,6 +89,7 @@ db.all('PRAGMA table_info(podcastEpisodes)', (error, rows) => {
         assert api('/api/capabilities', token=token)['knowledgeShelfV1'] is True
         assert api('/api/knowledge/jobs', token=token)['total'] == 0
         assert api('/api/knowledge/documents', token=token)['total'] == 0
+        subprocess.check_call([sys.executable, 'test/integration/web.py', base])
         docker('exec', name, 'mkdir', '-p', '/metadata/smoke-library')
         documents(base, token, '/metadata/smoke-library')
         docker('restart', name)

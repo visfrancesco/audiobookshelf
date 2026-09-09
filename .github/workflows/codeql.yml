@@ -5,7 +5,7 @@ on:
     branches: ['master']
     # Only build when files in these directories have been changed
     paths:
-      - client/**
+      - web/resources/js/**
       - server/**
       - test/**
       - index.js
@@ -15,7 +15,7 @@ on:
     branches: ['master']
     # Only build when files in these directories have been changed
     paths:
-      - client/**
+      - web/resources/js/**
       - server/**
       - test/**
       - index.js

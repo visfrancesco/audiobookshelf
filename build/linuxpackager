@@ -11,14 +11,7 @@ VERSION="$( eval echo $( jq '.version' package.json) )"
 DESCRIPTION="$( eval echo $( jq '.description' package.json) )"
 OUTPUT_FILE="audiobookshelf_${VERSION}_amd64.deb"
 
-echo ">>> Building Client"
-echo "--------------------"
-
-cd client
-rm -rf node_modules
-npm ci --unsafe-perm=true --allow-root
-npm run generate
-cd ..
+# This package contains the backend API. Use the Docker image for the Laravel UI.
 
 echo ">>> Building Server"
 echo "--------------------"

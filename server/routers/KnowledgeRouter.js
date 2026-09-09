@@ -100,6 +100,7 @@ function router(manager = require('../managers/KnowledgeShelfManager')) {
     const documents = await manager.models.knowledgeDocument.findAll({ where: { libraryId: libraries, ...(req.user.isAdminOrUp ? {} : { ownerId: req.user.id }) }, attributes: ['id'] })
     const where = { [Op.or]: [{ sourceId: sources.map(s => s.id) }, { 'payload.documentId': { [Op.in]: documents.map(d => d.id) } }] }
     if (req.query.state) where.state = req.query.state
+    if (typeof req.query.documentId === 'string') where['payload.documentId'] = req.query.documentId
     const result = await manager.models.knowledgeJob.findAndCountAll({ where, ...page(req), order: [['createdAt', 'DESC']] })
     res.json({ total: result.count, jobs: result.rows.map(jobJSON) })
   }))

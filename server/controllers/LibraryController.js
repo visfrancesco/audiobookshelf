@@ -854,7 +854,7 @@ class LibraryController {
    * @param {Response} res
    */
   async getUserPlaylistsForLibrary(req, res) {
-    let playlistsForUser = await Database.playlistModel.getOldPlaylistsForUserAndLibrary(req.user.id, req.library.id)
+    let playlistsForUser = await Database.playlistModel.getOldPlaylistsForUserAndLibrary(req.user.id, req.library.id, req.query.includeVideoEpisodes === '1')
 
     const payload = {
       results: [],

@@ -140,6 +140,17 @@ class Server {
    * @param {import('express').NextFunction} next
    */
   authMiddleware(req, res, next) {
+    if (req.method === 'GET' && req.query.uiTicket) {
+      try {
+        const userId = require('./knowledge/WebTickets').verify(req.query.uiTicket, req.path)
+        Database.userModel.findByPk(userId).then(user => {
+          if (!user?.isActive) return res.sendStatus(401)
+          req.user = user
+          next()
+        }).catch(() => res.sendStatus(401))
+      } catch (_) { res.sendStatus(401) }
+      return
+    }
     // ask passportjs if the current request is authenticated
     this.auth.isAuthenticated(req, res, next)
   }
@@ -401,35 +412,7 @@ class Server {
 
     const ReactClientPath = process.env.REACT_CLIENT_PATH
     if (!ReactClientPath) {
-      // Static path to generated nuxt
-      const distPath = Path.join(global.appRoot, '/client/dist')
-      router.use(express.static(distPath))
-
-      // Client dynamic routes
-      const dynamicRoutes = [
-        '/item/:id',
-        '/author/:id',
-        '/audiobook/:id/chapters',
-        '/audiobook/:id/edit',
-        '/audiobook/:id/manage',
-        '/library/:library',
-        '/library/:library/search',
-        '/library/:library/bookshelf/:id?',
-        '/library/:library/authors',
-        '/library/:library/narrators',
-        '/library/:library/stats',
-        '/library/:library/series/:id?',
-        '/library/:library/podcast/search',
-        '/library/:library/podcast/latest',
-        '/library/:library/podcast/download-queue',
-        '/config/users/:id',
-        '/config/users/:id/sessions',
-        '/config/item-metadata-utils/:id',
-        '/collection/:id',
-        '/playlist/:id',
-        '/share/:slug'
-      ]
-      dynamicRoutes.forEach((route) => router.get(route, (req, res) => res.sendFile(Path.join(distPath, 'index.html'))))
+      router.get('/', (req, res) => res.json({ product: 'KnowledgeShelf', service: 'backend', version }))
     } else {
       // This is for using the experimental Next.js client
       Logger.info(`Using React client at ${ReactClientPath}`)

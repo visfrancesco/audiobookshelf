@@ -8,23 +8,23 @@
     "dev": "nodemon --watch server index.js -- --dev",
     "start": "node index.js",
     "start-dev": "node index.js --prod-with-dev-env",
-    "client": "cd client && npm ci && npm run generate",
-    "prod": "npm run client && npm ci && node index.js",
-    "build-win": "npm run client && pkg -t node20-win-x64 -o ./dist/win/audiobookshelf -C GZip .",
-    "build-win-no-compress": "npm run client && pkg -t node20-win-x64 -o ./dist/win/audiobookshelf .",
+    "build-win": "pkg -t node20-win-x64 -o ./dist/win/audiobookshelf -C GZip .",
+    "build-win-no-compress": "pkg -t node20-win-x64 -o ./dist/win/audiobookshelf .",
     "build-linux": "build/linuxpackager",
-    "docker": "docker buildx build --platform linux/amd64,linux/arm64 --push .  -t advplyr/audiobookshelf",
-    "docker-amd64-local": "docker buildx build --platform linux/amd64 --load .  -t advplyr/audiobookshelf-amd64-local",
-    "docker-arm64-local": "docker buildx build --platform linux/arm64 --load .  -t advplyr/audiobookshelf-arm64-local",
+    "docker": "docker build -t knowledgeshelf:local .",
+    "docker-amd64-local": "docker buildx build --platform linux/amd64 --load -t knowledgeshelf:local .",
+    "docker-arm64-local": "docker buildx build --platform linux/arm64 --load -t knowledgeshelf:local-arm64 .",
     "deploy-linux": "node deploy/linux",
     "test": "mocha",
     "test:knowledge": "mocha test/server/knowledge/**/*.test.js",
-    "coverage": "nyc mocha"
+    "coverage": "nyc mocha",
+    "web:install": "composer install --working-dir=web && npm --prefix web ci",
+    "web:build": "npm --prefix web run build",
+    "web:test": "cd web && php artisan test && npm test"
   },
   "bin": "index.js",
   "pkg": {
     "assets": [
-      "client/dist/**/*",
       "node_modules/sqlite3/lib/binding/**/*.node",
       "server/migrations/*.js"
     ],

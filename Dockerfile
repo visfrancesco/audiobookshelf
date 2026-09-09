@@ -1,13 +1,26 @@
 ARG NUSQLITE3_DIR="/usr/local/lib/nusqlite3"
 ARG NUSQLITE3_PATH="${NUSQLITE3_DIR}/libnusqlite3.so"
 
-### STAGE 0: Build client ###
-FROM node:20-alpine AS build-client
+### Build the Laravel assets and production PHP dependencies ###
+FROM node:22-alpine AS build-web-assets
+WORKDIR /web
+COPY web/package*.json ./
+RUN CYPRESS_INSTALL_BINARY=0 npm ci
+COPY web/resources ./resources
+COPY web/vite.config.js ./
+RUN npm run build
 
-WORKDIR /client
-COPY /client /client
-RUN npm ci && npm cache clean --force
-RUN npm run generate
+FROM node:22-alpine AS build-web
+RUN apk add --no-cache php85 php85-phar php85-openssl php85-mbstring php85-dom php85-tokenizer php85-xml php85-xmlwriter php85-fileinfo php85-session php85-curl php85-pdo php85-iconv
+COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
+WORKDIR /web
+COPY web/ ./
+RUN mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
+    && php85 /usr/local/bin/composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader --no-scripts \
+    && php85 artisan package:discover \
+    && chmod -R a+rX /web
+COPY --from=build-web-assets /web/public/build ./public/build
+RUN chmod -R a+rX /web/public
 
 ### STAGE 1: Build server ###
 FROM node:22-alpine AS build-server
@@ -53,7 +66,22 @@ RUN apk add --no-cache --update \
   python3 \
   py3-pip \
   poppler-utils \
-  tini
+  tini \
+  caddy \
+  supervisor \
+  php85 \
+  php85-fpm \
+  php85-mbstring \
+  php85-openssl \
+  php85-session \
+  php85-fileinfo \
+  php85-dom \
+  php85-tokenizer \
+  php85-xml \
+  php85-xmlwriter \
+  php85-curl \
+  php85-pdo \
+  php85-iconv
 
 COPY tools/requirements-knowledge.txt /tmp/requirements-knowledge.txt
 RUN python3 -m venv /opt/knowledge-tools \
@@ -66,7 +94,9 @@ LABEL org.opencontainers.image.description="KnowledgeShelf audiobook, video and 
 WORKDIR /app
 
 # Copy compiled frontend and server from build stages
-COPY --from=build-client /client/dist /app/client/dist
+COPY --from=build-web /web /app/web
+COPY build/knowledgeshelf /etc/knowledgeshelf
+COPY build/knowledgeshelf/php.ini /etc/php85/conf.d/99-knowledgeshelf.ini
 COPY --from=build-server /server /app
 COPY --from=build-server ${NUSQLITE3_PATH} ${NUSQLITE3_PATH}
 
@@ -81,4 +111,5 @@ ENV NUSQLITE3_DIR=${NUSQLITE3_DIR}
 ENV NUSQLITE3_PATH=${NUSQLITE3_PATH}
 
 ENTRYPOINT ["tini", "--"]
-CMD ["node", "index.js"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s CMD wget -q -O /dev/null "http://127.0.0.1:${PORT:-80}/healthcheck" || exit 1
+CMD ["/etc/knowledgeshelf/entrypoint.sh"]

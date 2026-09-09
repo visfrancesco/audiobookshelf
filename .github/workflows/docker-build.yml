@@ -4,7 +4,8 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - 'client/**'
+      - 'web/**'
+      - 'build/knowledgeshelf/**'
       - 'server/**'
       - 'test/**'
       - 'tools/**'
@@ -25,7 +26,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  web:
+    uses: ./.github/workflows/component-tests.yml
+
   validate:
+    needs: web
     name: Test server and container
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -58,6 +63,29 @@ jobs:
         run: |
           python3 tools/test-release-image.py abs-review:${{ github.sha }}
           python3 tools/test-release-image.py abs-review:${{ github.sha }} --upgrade-from ghcr.io/advplyr/audiobookshelf:2.36.0@sha256:180acad33d69c99ed208676465d8edcb268fa46967735579a7810859885b1a8e
+      - name: Start isolated browser fixture
+        run: |
+          docker run -d --name knowledgeshelf-browser -p 127.0.0.1:18937:80 abs-review:${{ github.sha }}
+          for attempt in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:18937/status > /dev/null; then break; fi
+            sleep 1
+          done
+          python3 test/integration/web.py http://127.0.0.1:18937
+      - name: Test navigation, playback, and responsive layouts in a browser
+        working-directory: web
+        run: |
+          npm ci
+          npm run test:browser
+      - name: Save browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: knowledgeshelf-browser-screenshots
+          path: web/tests/Browser/screenshots
+          if-no-files-found: ignore
+      - name: Stop browser fixture
+        if: always()
+        run: docker rm -f knowledgeshelf-browser || true
 
   publish:
     name: Publish versioned amd64 and arm64 images
