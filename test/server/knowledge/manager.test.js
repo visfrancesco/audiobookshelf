@@ -65,6 +65,32 @@ describe('KnowledgeShelf library integration', function () {
     const asset = await context.models.knowledgeAsset.findOne()
     expect(await fs.readdir(Path.join(manager.root, 'media'))).not.to.include(asset.id)
   })
+  it('exposes native video through item and playback middleware without Pinchflat configuration', async () => {
+    const source = await manager.createSource(sourceBody, context.user)
+    await drain(manager.queue)
+    const native = require('../../../server/managers/KnowledgeShelfManager')
+    const legacy = require('../../../server/managers/VideoPodcastManager')
+    const saved = { ready: native.ready, config: legacy.config }
+    native.ready = true
+    legacy.config = null
+    const controller = require('../../../server/controllers/LibraryItemController')
+    const app = express()
+    app.use((req, _, next) => { req.user = context.user; next() })
+    app.get('/items/:id', controller.middleware.bind(controller), controller.findOne.bind(controller))
+    app.post('/items/:id/play/:episodeId', controller.middleware.bind(controller), (req, res) => res.json({ episodes: req.libraryItem.media.podcastEpisodes.map(episode => episode.id) }))
+    const server = app.listen(0, '127.0.0.1')
+    await new Promise(resolve => server.once('listening', resolve))
+    const url = `http://127.0.0.1:${server.address().port}/items/${source.libraryItemId}`
+    try {
+      const item = await (await fetch(url + '?expanded=1&includeVideoEpisodes=1')).json()
+      expect(item.media.episodes).to.have.length(1)
+      const legacyItem = await (await fetch(url + '?expanded=1')).json()
+      expect(legacyItem.media.episodes).to.have.length(0)
+      const episodeId = item.media.episodes[0].id
+      const playback = await (await fetch(url + `/play/${episodeId}?includeVideoEpisodes=1`, { method: 'POST' })).json()
+      expect(playback.episodes).to.include(episodeId)
+    } finally { await new Promise(resolve => server.close(resolve)); native.ready = saved.ready; legacy.config = saved.config }
+  })
   it('checks original revisions and refuses replacement files', async () => {
     await manager.createSource(sourceBody, context.user)
     await drain(manager.queue)

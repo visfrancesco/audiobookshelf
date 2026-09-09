@@ -21,6 +21,7 @@ class VideoPodcastManager {
     this.observedRevisions = new Map()
   }
   get enabled() { return !!this.config }
+  get supported() { return this.enabled || require('./KnowledgeShelfManager').ready }
   get records() { return Database.models.videoImport }
 
   async init(playbackSessionManager) {
