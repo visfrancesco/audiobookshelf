@@ -8,6 +8,7 @@ import time
 import urllib.error
 import urllib.request
 import uuid
+from knowledge_smoke import documents
 
 
 def docker(*args):
@@ -51,24 +52,52 @@ def main(image, upgrade_from=None):
         first = status()
         expected = docker('exec', name, 'node', '-p', 'require("/app/package.json").version')
         assert first['serverVersion'] == expected, first
+        assert first['product'] == 'KnowledgeShelf', first
         with urllib.request.urlopen(base + '/healthcheck', timeout=5) as response:
             assert response.status == 200
         with urllib.request.urlopen(base, timeout=5) as response:
-            assert 'Audiobookshelf' in response.read().decode()
+            assert 'KnowledgeShelf' in response.read().decode()
         for binary in ['ffmpeg', 'ffprobe']:
             docker('exec', name, binary, '-version')
+        docker('exec', name, 'pdftotext', '-v')
+        assert docker('exec', name, 'yt-dlp', '--ignore-config', '--js-runtimes', 'node', '--no-remote-components', '--version') == '2026.08.19'
         docker('exec', name, 'node', '-e', '''
 const sqlite = require('sqlite3');
 const db = new sqlite.Database('/config/absdatabase.sqlite', sqlite.OPEN_READONLY);
 db.all('PRAGMA table_info(podcastEpisodes)', (error, rows) => {
   if (error || !rows.some(row => row.name === 'videoSource')) process.exit(1);
-  db.close();
+  db.all("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('knowledgeSources','knowledgeJobs','knowledgeDocuments','knowledgeAssets')", (error, tables) => {
+    if (error || tables.length !== 4) process.exit(1);
+    db.close();
+  });
 });''')
+        # Exercise authenticated KnowledgeShelf APIs without contacting paid providers.
+        def api(path, body=None, token=None):
+            headers = {'Content-Type': 'application/json'}
+            if token:
+                headers['Authorization'] = 'Bearer ' + token
+            request = urllib.request.Request(base + path, data=json.dumps(body).encode() if body is not None else None, headers=headers)
+            with urllib.request.urlopen(request, timeout=10) as response:
+                value = response.read()
+                try:
+                    return json.loads(value)
+                except ValueError:
+                    return value.decode()
+        api('/init', {'newRoot': {'username': 'smoke', 'password': 'isolated-smoke-password'}})
+        login = api('/login', {'username': 'smoke', 'password': 'isolated-smoke-password'})
+        token = login['user'].get('accessToken') or login['user']['token']
+        assert api('/api/capabilities', token=token)['knowledgeShelfV1'] is True
+        assert api('/api/knowledge/jobs', token=token)['total'] == 0
+        assert api('/api/knowledge/documents', token=token)['total'] == 0
+        subprocess.check_call([sys.executable, 'test/integration/web.py', base])
+        docker('exec', name, 'mkdir', '-p', '/metadata/smoke-library')
+        documents(base, token, '/metadata/smoke-library')
         docker('restart', name)
         # Docker can assign a new ephemeral host port when the container restarts.
         base = address()
         assert status()['serverVersion'] == expected
-        print('Container startup, UI, healthcheck, media binaries, video schema and persistent restart passed for ' + expected + (' after 2.36.0 upgrade' if upgrade_from else ''))
+        assert api('/api/knowledge/status', token=token)['product'] == 'KnowledgeShelf'
+        print('Container startup, UI, authentication, KnowledgeShelf APIs/schema, media/document binaries and persistent restart passed for ' + expected + (' after 2.36.0 upgrade' if upgrade_from else ''))
     except Exception:
         subprocess.run(['docker', 'logs', '--tail', '80', name], check=False)
         raise

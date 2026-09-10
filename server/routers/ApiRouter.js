@@ -63,7 +63,24 @@ class ApiRouter {
 
   init() {
     const videoPodcasts = require('../managers/VideoPodcastManager')
-    this.router.get('/capabilities', (req, res) => res.json({ videoPodcastsV1: videoPodcasts.enabled }))
+    const knowledge = require('../managers/KnowledgeShelfManager')
+    this.router.get('/capabilities', (req, res) => res.json({ videoPodcastsV1: videoPodcasts.enabled || knowledge.ready, ...knowledge.capabilities() }))
+    this.router.use('/knowledge', require('./KnowledgeRouter')(knowledge))
+    this.router.post('/ui/media-tickets', (req, res) => {
+      const paths = req.body.paths
+      if (!Array.isArray(paths) || !paths.length || paths.length > 100 || paths.some(path => typeof path !== 'string')) return res.sendStatus(400)
+      try {
+        const tickets = Object.fromEntries(paths.map(path => [path, `/api${path}?uiTicket=${require('../knowledge/WebTickets').issue(req.user.id, path)}`]))
+        res.set('Cache-Control', 'no-store').json({ tickets })
+      } catch (error) { res.status(error.status || 400).json({ error: error.message }) }
+    })
+    this.router.get('/ui/session', async (req, res) => {
+      try {
+        const { id, username, type, isActive, permissions } = req.user.toOldJSONForBrowser()
+        const libraries = (await Database.libraryModel.getAllWithFolders()).filter(library => req.user.checkCanAccessLibrary(library.id)).map(library => library.toOldJSON())
+        res.set('Cache-Control', 'private, no-store').json({ user: { id, username, type, isActive, permissions }, libraries, settings: Database.serverSettings.toJSONForBrowser() })
+      } catch (_) { res.sendStatus(500) }
+    })
     this.router.get('/video-imports', async (req, res) => {
       if (!req.user.isAdminOrUp) return res.sendStatus(403)
       try { res.json(await videoPodcasts.records.findAll({ order: [['updatedAt', 'DESC']], limit: 200 })) }

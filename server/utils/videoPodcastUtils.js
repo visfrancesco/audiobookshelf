@@ -44,7 +44,7 @@ function describeVideo(raw) {
   return {
     duration, container: raw.format.format_name, audioIndex: audio.index, audioCodec: audio.codec_name, videoCodec: video.codec_name,
     audioBitRate: Number(audio.bit_rate) || 0, width: video.width, height: video.height,
-    watchAvailable, watchReason: watchAvailable ? null : 'Watch requires MP4 with 8-bit H.264 4:2:0 video and AAC audio. Change the Pinchflat download profile.',
+    watchAvailable, watchReason: watchAvailable ? null : 'Watch requires MP4 with 8-bit H.264 4:2:0 video and AAC audio. Change the source download profile.',
     chapters: normalizeChapters(raw.chapters, duration)
   }
 }

@@ -1,4 +1,4 @@
-name: Integration Test
+name: Backend Binary Integration
 
 on:
   pull_request:
@@ -7,11 +7,13 @@ on:
       - 'dependabot/**' # Don't run dependabot branches, as they are already covered by pull requests
     # Only build when files in these directories have been changed
     paths:
-      - client/**
       - server/**
       - test/**
       - index.js
       - package.json
+      - package-lock.json
+      - tools/**
+      - .github/workflows/integration-test.yml
 
 jobs:
   build:
@@ -29,16 +31,11 @@ jobs:
       - name: install pkg (using yao-pkg fork for targeting node20)
         run: npm install -g @yao-pkg/pkg
 
-      - name: get client dependencies
-        working-directory: client
-        run: npm ci
-
-      - name: build client
-        working-directory: client
-        run: npm run generate
-
       - name: get server dependencies
         run: npm ci --only=production
+
+      - name: Install document tools
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
 
       - name: build binary
         run: pkg -t node20-linux-x64 -o audiobookshelf .
@@ -54,7 +51,9 @@ jobs:
               cat /tmp/abs-startup.log
               exit 1
             fi
-            if curl -fsS --max-time 3 http://127.0.0.1:3333 -o /tmp/abs-index.html 2>/dev/null && grep -q Audiobookshelf /tmp/abs-index.html; then
+            if curl -fsS --max-time 3 http://127.0.0.1:3333/status -o /tmp/abs-status.json 2>/dev/null && python3 -c 'import json; assert json.load(open("/tmp/abs-status.json"))["product"] == "KnowledgeShelf"'; then
+              mkdir -p /tmp/knowledge-integration-books
+              python3 tools/knowledge_smoke.py http://127.0.0.1:3333 --library-path /tmp/knowledge-integration-books
               exit 0
             fi
             sleep 2

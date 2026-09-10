@@ -70,7 +70,7 @@ class LibraryItemController {
   async findOne(req, res) {
     const includeEntities = (req.query.include || '').split(',')
     if (req.query.expanded == 1) {
-      const item = req.libraryItem.toOldJSONExpanded(req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').enabled)
+      const item = req.libraryItem.toOldJSONExpanded(req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').supported)
 
       // Include users media progress
       if (includeEntities.includes('progress')) {
@@ -1214,7 +1214,7 @@ class LibraryItemController {
    * @param {NextFunction} next
    */
   async middleware(req, res, next) {
-    req.libraryItem = await Database.libraryItemModel.getExpandedById(req.params.id, req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').enabled)
+    req.libraryItem = await Database.libraryItemModel.getExpandedById(req.params.id, req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').supported)
     if (!req.libraryItem?.media) return res.sendStatus(404)
 
     // Check user can access this library item

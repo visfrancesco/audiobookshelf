@@ -1,48 +1,54 @@
-name: Run Component Tests
+name: KnowledgeShelf Web Checks
 
 on:
+  workflow_call:
   workflow_dispatch:
-    inputs:
-      ref:
-        description: 'Branch/Tag/SHA to test'
-        required: true
   pull_request:
-    paths:
-      - 'client/**'
-      - '.github/workflows/component-tests.yml'
+    paths: ['web/**', '.github/workflows/component-tests.yml']
   push:
-    paths:
-      - 'client/**'
-      - '.github/workflows/component-tests.yml'
+    paths: ['web/**', '.github/workflows/component-tests.yml']
+
+permissions:
+  contents: read
 
 jobs:
-  run-component-tests:
-    name: Run Component Tests
+  web:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
     steps:
-      - name: Checkout (push/pull request)
-        uses: actions/checkout@v4
-        if: github.event_name != 'workflow_dispatch'
-
-      - name: Checkout (workflow_dispatch)
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
         with:
-          ref: ${{ inputs.ref }}
-        if: github.event_name == 'workflow_dispatch'
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+          php-version: '8.5'
+          extensions: mbstring, dom, xml, curl, fileinfo, pdo_sqlite
+          coverage: none
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
-
-      - name: Install dependencies
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install PHP and frontend dependencies
+        env:
+          CYPRESS_INSTALL_BINARY: '0'
         run: |
-          cd client
+          composer install --prefer-dist --no-interaction
+          cp .env.example .env
+          php artisan key:generate
           npm ci
-
-      - name: Run tests
+      - name: Build the production interface
+        run: npm run build
+      - name: Test pages, permissions, API contracts, and playback
         run: |
-          cd client
+          vendor/bin/phpunit
           npm test
+      - name: Check PHP formatting
+        run: |
+          vendor/bin/pint --format agent
+          git diff --exit-code
+      - name: Check cached routes and views
+        run: |
+          php artisan route:cache
+          php artisan view:cache

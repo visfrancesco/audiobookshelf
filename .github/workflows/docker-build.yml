@@ -4,7 +4,8 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - 'client/**'
+      - 'web/**'
+      - 'build/knowledgeshelf/**'
       - 'server/**'
       - 'test/**'
       - 'tools/**'
@@ -25,7 +26,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  web:
+    uses: ./.github/workflows/component-tests.yml
+
   validate:
+    needs: web
     name: Test server and container (${{ matrix.arch }})
     strategy:
       fail-fast: false
@@ -43,12 +48,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - name: Install test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y ffmpeg poppler-utils
           npm ci
       - name: Test server and lifecycle adapter
         run: |
@@ -68,6 +73,33 @@ jobs:
         run: |
           python3 tools/test-release-image.py abs-review:${{ github.sha }}
           python3 tools/test-release-image.py abs-review:${{ github.sha }} --upgrade-from ghcr.io/advplyr/audiobookshelf:2.36.0@sha256:180acad33d69c99ed208676465d8edcb268fa46967735579a7810859885b1a8e
+
+      - name: Start isolated browser fixture
+        if: matrix.arch == 'amd64'
+        run: |
+          docker run -d --name knowledgeshelf-browser -p 127.0.0.1:18937:80 abs-review:${{ github.sha }}
+          for attempt in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:18937/status > /dev/null; then break; fi
+            sleep 1
+          done
+          python3 test/integration/web.py http://127.0.0.1:18937
+      - name: Test navigation, playback, and responsive layouts in a browser
+        if: matrix.arch == 'amd64'
+        working-directory: web
+        run: |
+          npm ci
+          npx cypress install
+          npm run test:browser
+      - name: Save browser screenshots
+        if: always() && matrix.arch == 'amd64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: knowledgeshelf-browser-screenshots
+          path: web/tests/Browser/screenshots
+          if-no-files-found: ignore
+      - name: Stop browser fixture
+        if: always() && matrix.arch == 'amd64'
+        run: docker rm -f knowledgeshelf-browser || true
 
   publish:
     name: Publish image (${{ matrix.arch }})

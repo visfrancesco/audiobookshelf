@@ -201,7 +201,7 @@ class LibraryController {
         if (library.mediaType === 'book') {
           library.stats = await libraryItemsBookFilters.getBookLibraryStats(library.id)
         } else if (library.mediaType === 'podcast') {
-          library.stats = await libraryItemsPodcastFilters.getPodcastLibraryStats(library.id, req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').enabled)
+          library.stats = await libraryItemsPodcastFilters.getPodcastLibraryStats(library.id, req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').supported)
         }
       }
     }
@@ -617,7 +617,7 @@ class LibraryController {
       sortBy: req.query.sort,
       sortDesc: req.query.desc === '1',
       filterBy: req.query.filter,
-      includeVideoEpisodes: req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').enabled,
+      includeVideoEpisodes: req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').supported,
       mediaType: req.library.mediaType,
       minified: req.query.minified === '1',
       collapseseries: req.query.collapseseries === '1',
@@ -855,7 +855,7 @@ class LibraryController {
    * @param {Response} res
    */
   async getUserPlaylistsForLibrary(req, res) {
-    let playlistsForUser = await Database.playlistModel.getOldPlaylistsForUserAndLibrary(req.user.id, req.library.id, req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').enabled)
+    let playlistsForUser = await Database.playlistModel.getOldPlaylistsForUserAndLibrary(req.user.id, req.library.id, req.query.includeVideoEpisodes === '1')
 
     const payload = {
       results: [],
@@ -897,7 +897,7 @@ class LibraryController {
       .split(',')
       .map((v) => v.trim().toLowerCase())
       .filter((v) => !!v)
-    const shelves = await Database.libraryItemModel.getPersonalizedShelves(req.library, req.user, include, limitPerShelf, req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').enabled)
+    const shelves = await Database.libraryItemModel.getPersonalizedShelves(req.library, req.user, include, limitPerShelf, req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').supported)
     res.json(shelves)
   }
 
@@ -968,7 +968,7 @@ class LibraryController {
     const limit = req.query.limit || 12
     const query = req.query.q.trim()
 
-    const matches = await libraryItemFilters.search(req.user, req.library, query, limit, req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').enabled)
+    const matches = await libraryItemFilters.search(req.user, req.library, query, limit, req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').supported)
     res.json(matches)
   }
 
@@ -1001,8 +1001,8 @@ class LibraryController {
       stats.numAudioTracks = bookStats.numAudioFiles
     } else {
       const genres = await libraryItemsPodcastFilters.getGenresWithCount(req.library.id)
-      const podcastStats = await libraryItemsPodcastFilters.getPodcastLibraryStats(req.library.id, req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').enabled)
-      const longestPodcasts = await libraryItemsPodcastFilters.getLongestPodcasts(req.library.id, 10, req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').enabled)
+      const podcastStats = await libraryItemsPodcastFilters.getPodcastLibraryStats(req.library.id, req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').supported)
+      const longestPodcasts = await libraryItemsPodcastFilters.getLongestPodcasts(req.library.id, 10, req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').supported)
 
       stats.totalGenres = genres.length
       stats.genresWithCount = genres
@@ -1296,7 +1296,7 @@ class LibraryController {
     }
 
     const offset = payload.page * payload.limit
-    payload.episodes = await libraryItemsPodcastFilters.getRecentEpisodes(req.user, req.library, payload.limit, offset, req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').enabled)
+    payload.episodes = await libraryItemsPodcastFilters.getRecentEpisodes(req.user, req.library, payload.limit, offset, req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').supported)
     res.json(payload)
   }
 

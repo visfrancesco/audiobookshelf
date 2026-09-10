@@ -561,7 +561,7 @@ class PodcastController {
    * @param {NextFunction} next
    */
   async middleware(req, res, next) {
-    const libraryItem = await Database.libraryItemModel.getExpandedById(req.params.id, req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').enabled)
+    const libraryItem = await Database.libraryItemModel.getExpandedById(req.params.id, req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').supported)
     if (!libraryItem?.media) return res.sendStatus(404)
 
     if (!libraryItem.isPodcast) {

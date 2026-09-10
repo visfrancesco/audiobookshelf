@@ -72,13 +72,16 @@ class PlaylistController {
     // Validate podcast episodes
     if (isPodcast) {
       const podcastEpisodeIds = items.map((i) => i.episodeId)
-      const podcastEpisodes = await (req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').enabled ? Database.podcastEpisodeModel.unscoped() : Database.podcastEpisodeModel).findAll({
-        attributes: ['id'],
+      const podcastEpisodes = await (req.query.includeVideoEpisodes === '1' ? Database.podcastEpisodeModel.unscoped() : Database.podcastEpisodeModel).findAll({
+        attributes: ['id', 'podcastId'],
         where: {
           id: podcastEpisodeIds
         }
       })
-      if (podcastEpisodes.length !== podcastEpisodeIds.length) {
+      if (podcastEpisodes.length !== podcastEpisodeIds.length || items.some(item => {
+        const libraryItem = libraryItems.find(libraryItem => libraryItem.id === item.libraryItemId)
+        return !podcastEpisodes.some(episode => episode.id === item.episodeId && episode.podcastId === libraryItem.mediaId)
+      })) {
         return res.status(400).send('Invalid playlist data. Invalid podcast episodes')
       }
     }
@@ -112,7 +115,7 @@ class PlaylistController {
 
       await transaction.commit()
 
-      newPlaylist.playlistMediaItems = await newPlaylist.getMediaItemsExpandedWithLibraryItem(req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').enabled)
+      newPlaylist.playlistMediaItems = await newPlaylist.getMediaItemsExpandedWithLibraryItem(req.query.includeVideoEpisodes === '1')
 
       const jsonExpanded = newPlaylist.toOldJSONExpanded()
       SocketAuthority.clientEmitter(newPlaylist.userId, 'playlist_added', { ...jsonExpanded, items: jsonExpanded.items.filter(item => !item.episode?.videoSource) })
@@ -136,7 +139,7 @@ class PlaylistController {
    * @param {Response} res
    */
   async findAllForUser(req, res) {
-    const playlistsForUser = await Database.playlistModel.getOldPlaylistsForUserAndLibrary(req.user.id, undefined, req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').enabled)
+    const playlistsForUser = await Database.playlistModel.getOldPlaylistsForUserAndLibrary(req.user.id, null, req.query.includeVideoEpisodes === '1')
     const accessiblePlaylists = playlistsForUser.filter((p) => req.user.checkCanAccessLibrary(p.libraryId))
     res.json({
       playlists: accessiblePlaylists
@@ -150,7 +153,7 @@ class PlaylistController {
    * @param {Response} res
    */
   async findOne(req, res) {
-    req.playlist.playlistMediaItems = await req.playlist.getMediaItemsExpandedWithLibraryItem(req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').enabled)
+    req.playlist.playlistMediaItems = await req.playlist.getMediaItemsExpandedWithLibraryItem(req.query.includeVideoEpisodes === '1')
     res.json(req.playlist.toOldJSONExpanded())
   }
 
@@ -246,7 +249,7 @@ class PlaylistController {
       }
     }
 
-    req.playlist.playlistMediaItems = await req.playlist.getMediaItemsExpandedWithLibraryItem(req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').enabled)
+    req.playlist.playlistMediaItems = await req.playlist.getMediaItemsExpandedWithLibraryItem(req.query.includeVideoEpisodes === '1')
 
     const jsonExpanded = req.playlist.toOldJSONExpanded()
     if (wasUpdated) {
@@ -263,7 +266,7 @@ class PlaylistController {
    * @param {Response} res
    */
   async delete(req, res) {
-    req.playlist.playlistMediaItems = await req.playlist.getMediaItemsExpandedWithLibraryItem(req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').enabled)
+    req.playlist.playlistMediaItems = await req.playlist.getMediaItemsExpandedWithLibraryItem(req.query.includeVideoEpisodes === '1')
     const jsonExpanded = req.playlist.toOldJSONExpanded()
 
     await req.playlist.destroy()
@@ -287,7 +290,7 @@ class PlaylistController {
       return res.status(400).send('Request body has no libraryItemId')
     }
 
-    const libraryItem = await Database.libraryItemModel.getExpandedById(itemToAdd.libraryItemId, req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').enabled)
+    const libraryItem = await Database.libraryItemModel.getExpandedById(itemToAdd.libraryItemId, req.query.includeVideoEpisodes === '1')
     if (!libraryItem) {
       return res.status(400).send('Library item not found')
     }
@@ -301,7 +304,7 @@ class PlaylistController {
       return res.status(400).send('Episode not found in library item')
     }
 
-    req.playlist.playlistMediaItems = await req.playlist.getMediaItemsExpandedWithLibraryItem(req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').enabled)
+    req.playlist.playlistMediaItems = await req.playlist.getMediaItemsExpandedWithLibraryItem(req.query.includeVideoEpisodes === '1')
 
     if (req.playlist.checkHasMediaItem(itemToAdd.libraryItemId, itemToAdd.episodeId)) {
       return res.status(400).send('Item already in playlist')
@@ -345,7 +348,7 @@ class PlaylistController {
    * @param {Response} res
    */
   async removeItem(req, res) {
-    req.playlist.playlistMediaItems = await req.playlist.getMediaItemsExpandedWithLibraryItem(req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').enabled)
+    req.playlist.playlistMediaItems = await req.playlist.getMediaItemsExpandedWithLibraryItem(req.query.includeVideoEpisodes === '1')
 
     let playlistMediaItem = null
     if (req.params.episodeId) {
@@ -404,7 +407,7 @@ class PlaylistController {
       return res.status(400).send('Invalid request body items')
     }
 
-    req.playlist.playlistMediaItems = await req.playlist.getMediaItemsExpandedWithLibraryItem(req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').enabled)
+    req.playlist.playlistMediaItems = await req.playlist.getMediaItemsExpandedWithLibraryItem(req.query.includeVideoEpisodes === '1')
 
     const mediaItemsToAdd = []
     const jsonExpanded = req.playlist.toOldJSONExpanded()
@@ -465,7 +468,7 @@ class PlaylistController {
       return res.status(400).send('Invalid request body items')
     }
 
-    req.playlist.playlistMediaItems = await req.playlist.getMediaItemsExpandedWithLibraryItem(req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').enabled)
+    req.playlist.playlistMediaItems = await req.playlist.getMediaItemsExpandedWithLibraryItem(req.query.includeVideoEpisodes === '1')
 
     // Remove playlist media items
     let hasUpdated = false
@@ -554,7 +557,7 @@ class PlaylistController {
 
       await transaction.commit()
 
-      playlist.playlistMediaItems = await playlist.getMediaItemsExpandedWithLibraryItem(req.query.includeVideoEpisodes === '1' && require('../managers/VideoPodcastManager').enabled)
+      playlist.playlistMediaItems = await playlist.getMediaItemsExpandedWithLibraryItem(req.query.includeVideoEpisodes === '1')
 
       const jsonExpanded = playlist.toOldJSONExpanded()
       SocketAuthority.clientEmitter(playlist.userId, 'playlist_added', { ...jsonExpanded, items: jsonExpanded.items.filter(item => !item.episode?.videoSource) })
