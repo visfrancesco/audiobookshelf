@@ -1,7 +1,8 @@
 @extends('layouts.app')
 @section('title', $entity['name'] ?? 'Your list')
 @section('content')
-<header class="page-header"><div><p class="eyebrow">{{ strtoupper(rtrim($kind, 's')) }}</p><h1>{{ $entity['name'] ?? 'Your list' }}</h1><p class="description">{{ strip_tags($entity['description'] ?? '') }}</p></div></header>
+@if($entity['libraryId'] ?? session('shelf.default_library'))<a class="back-link" href="{{ route('library', ['id' => $entity['libraryId'] ?? session('shelf.default_library'), 'view' => $kind]) }}" wire:navigate>← Back to {{ $kind }}</a>@endif
+<header class="page-header"><div><p class="eyebrow">{{ strtoupper(rtrim($kind, 's')) }}</p><h1>{{ $entity['name'] ?? 'Your list' }}</h1><p class="muted">{{ $entity['total'] ?? count($entity['books'] ?? $entity['libraryItems'] ?? $entity['items'] ?? []) }} items</p><x-description :text="$entity['description'] ?? ''" /></div></header>
 <div class="shelf-grid">
 @foreach($entity['books'] ?? $entity['libraryItems'] ?? $entity['items'] ?? [] as $entry)
 @php($item = $entry['libraryItem'] ?? $entry)<div><x-item-card :item="$item" />

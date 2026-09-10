@@ -72,7 +72,7 @@ class PodcastController extends Controller
             $api->get("/api/podcasts/$id/clear-queue");
         } elseif ($action === 'remove') {
             $episodeId = $request->validate(['episodeId' => 'required|uuid'])['episodeId'];
-            $api->delete("/api/podcasts/$id/episode/$episodeId");
+            $api->delete("/api/podcasts/$id/episode/$episodeId?includeVideoEpisodes=1");
         } elseif ($action === 'schedule') {
             $data = $request->validate(['schedule' => 'required|string|max:100', 'maxEpisodesToKeep' => 'required|integer|min:0|max:10000']);
             $api->patch("/api/items/$id/media", ['autoDownloadEpisodes' => $request->boolean('autoDownloadEpisodes'), 'autoDownloadSchedule' => $data['schedule'], 'maxEpisodesToKeep' => (int) $data['maxEpisodesToKeep']]);

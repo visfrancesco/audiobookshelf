@@ -1,9 +1,11 @@
 @extends('layouts.app')
 @section('title', $sections[$section])
 @section('content')
-<header class="page-header"><div><p class="eyebrow">YOUR WORKSPACE</p><h1>{{ $sections[$section] }}</h1><p class="muted">KnowledgeShelf {{ session('shelf.settings.version', '2.37.0') }}</p></div></header><nav class="section-nav" aria-label="Administration">
-@foreach($sections as $key => $label)<a href="{{ route('manage', $key) }}" wire:navigate @class(['active' => $key === $section])>{{ $label }}</a>
-@endforeach</nav>
+<header class="page-header"><div><p class="eyebrow">YOUR WORKSPACE</p><h1>{{ $sections[$section] }}</h1><p class="muted">KnowledgeShelf {{ session('shelf.settings.version', '2.37.0') }}</p></div></header><nav class="admin-navigation" aria-label="Administration">
+@foreach(['Library & people' => ['libraries', 'users', 'tags', 'sessions'], 'Connections' => ['feeds', 'email', 'notifications', 'metadata'], 'Server & security' => ['settings', 'authentication', 'api-keys', 'backups', 'logs']] as $group => $keys)
+<div class="admin-nav-group"><p class="nav-label">{{ $group }}</p><div class="section-nav">
+@foreach($keys as $key)<a href="{{ route('manage', $key) }}" wire:navigate aria-current="{{ $key === $section ? 'page' : 'false' }}" @class(['active' => $key === $section])>{{ $sections[$key] }}</a>@endforeach
+</div></div>@endforeach</nav>
 @if($fields)<section class="panel"><form method="post" action="{{ route('manage.action', [$section, 'save']) }}" class="stack">
 @csrf
 @if($section === 'authentication')<fieldset><legend>Sign-in methods</legend>

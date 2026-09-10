@@ -2,6 +2,7 @@
 """Exercise Laravel and Node together on an isolated review container."""
 import http.cookiejar
 import io
+import os
 import wave
 import json
 import sys
@@ -52,7 +53,7 @@ class WebIntegration(unittest.TestCase):
         libraries = cls.api('/api/libraries')['libraries']
         if not any(library['name'] == 'Web integration library' for library in libraries):
             page, _ = cls.get('/manage/libraries')
-            cls.post('/manage/libraries/save', {'_token': FormTokens(page).token, 'name': 'Web integration library', 'mediaType': 'book', 'paths': '/metadata/web-integration-books', 'provider': 'google', 'icon': 'database'})
+            cls.post('/manage/libraries/save', {'_token': FormTokens(page).token, 'name': 'Web integration library', 'mediaType': 'book', 'paths': os.environ.get('WEB_FIXTURE_MEDIA_ROOT', '/metadata/web-integration-books'), 'provider': 'google', 'icon': 'database'})
             libraries = cls.api('/api/libraries')['libraries']
         cls.library = next(library for library in libraries if library['name'] == 'Web integration library')
 

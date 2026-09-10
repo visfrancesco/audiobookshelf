@@ -4,6 +4,32 @@ const YouTube = require('../../../server/knowledge/YouTube')
 const { rejects } = require('./helpers')
 
 describe('KnowledgeShelf provider contracts', () => {
+  it('caps every video format alternative and avoids unwatchable codec fallbacks', async () => {
+    const fs = require('fs/promises'), Path = require('path'), os = require('os')
+    const directory = await fs.mkdtemp(Path.join(os.tmpdir(), 'quality-test-'))
+    try {
+      for (const quality of [360, 480, 720, 1080, 1440, 2160]) {
+        let args
+        const provider = new YouTube({ execute: async (_, values) => { args = values; return { stdout: '' } } })
+        await provider.download({ mode: 'video', options: { videoQuality: quality } }, 'abcdefghijk', directory)
+        const alternatives = args[args.indexOf('--format') + 1].split('/')
+        expect(alternatives).to.have.length(2)
+        for (const format of alternatives) {
+          expect(format).to.include(`[height<=${quality}]`)
+          expect(format).to.include('[vcodec^=avc1]')
+        }
+      }
+    } finally { await fs.rm(directory, { recursive: true, force: true }) }
+  })
+  it('defaults old sources to 1080p and rejects unsupported quality settings', () => {
+    const { sourceValues } = require('../../../server/knowledge/validation')
+    const source = { name: 'Source', url: 'https://youtube.com/@channel' }
+    expect(sourceValues(source).options.videoQuality).to.equal(1080)
+    expect(sourceValues({ ...source, videoQuality: 480 }).options.videoQuality).to.equal(480)
+    for (const quality of [0, 800, 4320, '720', 'best']) {
+      expect(() => sourceValues({ ...source, videoQuality: quality })).to.throw('video quality')
+    }
+  })
   it('sends full text and bounded continuity context to ElevenLabs', async () => {
     let request
     const provider = new ElevenLabs({ key: 'secret-key', request: async options => { request = options; return { data: Buffer.from('audio'), headers: { 'content-type': 'audio/mpeg' } } } })

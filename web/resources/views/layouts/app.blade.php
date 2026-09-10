@@ -16,7 +16,7 @@
     <nav>
 
 @foreach($libraries as $library)
-            <a href="{{ route('library', $library['id']) }}" wire:navigate @class(['nav-link', 'active' => request()->route('id') === $library['id']])><span class="nav-symbol">{{ $library['mediaType'] === 'podcast' ? '◉' : '▤' }}</span>{{ $library['name'] }}</a>
+            <a href="{{ route('library', $library['id']) }}" wire:navigate @class(['nav-link', 'active' => (isset($item) ? ($item['libraryId'] ?? null) : (isset($entity) ? ($entity['libraryId'] ?? session('shelf.default_library')) : request()->route('id'))) === $library['id']])><span class="nav-symbol">{{ $library['mediaType'] === 'podcast' ? '◉' : '▤' }}</span>{{ $library['name'] }}</a>
 
 @endforeach
         <p class="nav-label">BRING SOMETHING NEW</p>
@@ -35,6 +35,7 @@
     <div class="sidebar-bottom"><a href="{{ route('account') }}" wire:navigate class="account-link"><span class="avatar">{{ mb_strtoupper(mb_substr($shelfUser['username'], 0, 1)) }}</span><span>{{ $shelfUser['username'] }}<small>Account & listening</small></span></a><form action="{{ route('logout') }}" method="post">
 @csrf<button class="text-button" type="submit">Sign out</button></form></div>
 </aside>
+<button class="nav-backdrop" type="button" aria-label="Close navigation" data-close-nav hidden></button>
 <button class="mobile-menu" type="button" aria-controls="navigation" aria-expanded="false" data-toggle-nav>☰ <span>KnowledgeShelf</span></button>
 @endif
 <main id="main" @class(['main', 'guest-main' => !isset($shelfUser)])>

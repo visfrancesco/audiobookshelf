@@ -23,13 +23,13 @@
 @if($item['mediaType'] === 'book')<form class="inline-form" method="post" action="{{ route('item.action', [$item['id'], 'finished']) }}">
 @csrf<input type="hidden" name="finished" value="{{ empty($item['userMediaProgress']['isFinished']) ? 1 : 0 }}"><button class="text-button">{{ empty($item['userMediaProgress']['isFinished']) ? 'Mark as finished' : 'Mark as unfinished' }}</button></form>
 @endif
-<p class="description">{{ strip_tags($metadata['description'] ?? '') }}</p></div></section>
+<x-description :text="$metadata['description'] ?? ''" collapsible /></div></section>
 @if($item['mediaType'] === 'podcast')
 <section class="section"><div class="section-heading"><h2>Episodes</h2>
 @if($isAdmin)<a href="{{ route('podcasts.episodes', $item['id']) }}" wire:navigate>Find & download episodes →</a>
 @endif</div>
 <div class="episode-list">
-@forelse($item['media']['episodes'] ?? [] as $episode)<article class="episode"><div class="episode-copy"><small>{{ !empty($episode['publishedAt']) ? date('M j, Y', (int) ($episode['publishedAt'] / 1000)) : '' }}
+@forelse(collect($item['media']['episodes'] ?? [])->sortByDesc('publishedAt') as $episode)<article class="episode"><div class="episode-copy"><small>{{ !empty($episode['publishedAt']) ? date('M j, Y', (int) ($episode['publishedAt'] / 1000)) : '' }}
 @if(!empty($episode['videoSource'])) · <span class="tag">Video</span>
 @endif</small><h3>{{ $episode['title'] }}</h3><p>{{ \Illuminate\Support\Str::limit(strip_tags($episode['description'] ?? ''), 260) }}</p>
 @if(!empty($episode['chapters']))<details><summary>Chapters</summary><ol class="chapter-list">
@@ -45,7 +45,7 @@
 @if(($episode['videoSource']['available'] ?? true) === false)<span class="status-badge">Original unavailable</span>
 @else<button class="button primary small" type="button" data-play data-item="{{ $item['id'] }}" data-episode="{{ $episode['id'] }}" data-mode="audio" data-can-watch="{{ !empty($episode['videoSource']['watchAvailable']) ? 1 : 0 }}">▶ Listen</button>
 @if(!empty($episode['videoSource']['watchAvailable']))<button class="button secondary small" type="button" data-play data-item="{{ $item['id'] }}" data-episode="{{ $episode['id'] }}" data-mode="video" data-can-watch="1">Watch</button>
-@elseif(!empty($episode['videoSource']['watchReason']))<small>{{ $episode['videoSource']['watchReason'] }}</small>
+@elseif(!empty($episode['videoSource']['watchReason']))<div class="playback-help"><p>Video is not ready for this browser. You can still listen.</p>@if($isAdmin)<a href="{{ route('sources') }}" wire:navigate>Manage video sources</a><details><summary>Technical details</summary><small>{{ $episode['videoSource']['watchReason'] }}</small></details>@endif</div>
 @endif
 @endif
 @if($isAdmin)<form method="post" action="{{ route('podcasts.action', [$item['id'], 'remove']) }}" data-confirm="Remove this episode from the library?">

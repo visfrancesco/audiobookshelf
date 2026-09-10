@@ -7,6 +7,16 @@ use Tests\TestCase;
 
 class PodcastControllerTest extends TestCase
 {
+    public function test_removing_a_video_episode_includes_it_in_the_backend_lookup(): void
+    {
+        $this->backend(['/api/podcasts/'.self::ITEM.'/episode/'.self::EPISODE.'?includeVideoEpisodes=1' => Http::response('', 204)], mediaType: 'podcast');
+
+        $this->from('/item/'.self::ITEM)->post('/podcasts/'.self::ITEM.'/remove', ['episodeId' => self::EPISODE])
+            ->assertRedirect('/item/'.self::ITEM)->assertSessionHas('status');
+
+        Http::assertSent(fn ($request) => $request->method() === 'DELETE' && str_ends_with($request->url(), '/episode/'.self::EPISODE.'?includeVideoEpisodes=1'));
+    }
+
     public function test_rss_preview_displays_metadata_and_saves_it_for_subscription(): void
     {
         $this->backend(['/api/podcasts/feed' => ['podcast' => ['metadata' => ['title' => 'A podcast', 'description' => '<script>alert(1)</script>'], 'episodes' => []]]], mediaType: 'podcast');

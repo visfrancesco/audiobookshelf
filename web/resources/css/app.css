@@ -121,7 +121,7 @@ small {
     width: 238px;
     background: #edf0e8;
     border-right: 1px solid var(--line);
-    padding: 32px 20px 120px;
+    padding: 32px 20px 24px;
     display: flex;
     flex-direction: column;
     z-index: 30;
@@ -358,11 +358,12 @@ small {
     display: block;
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
+    background: #edf0e8;
     transition: transform 0.18s;
 }
 .cover-link:hover img {
-    transform: scale(1.025);
+    transform: none;
 }
 .cover-action {
     position: absolute;
@@ -384,18 +385,23 @@ small {
     padding-top: 13px;
 }
 .item-copy h3 {
-    font-size: 0.82rem;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+    min-height: 4.05em;
+    font-size: 0.92rem;
     font-weight: 650;
-    margin: 0 0 5px;
+    margin: 0 0 8px;
 }
 .item-copy p {
-    font-size: 0.73rem;
-    color: #7c8175;
+    font-size: 0.82rem;
+    color: #58665c;
     line-height: 1.45;
     margin: 0 0 7px;
 }
 .item-copy small {
-    font-size: 0.65rem;
+    font-size: 0.78rem;
 }
 .item-copy progress {
     width: 100%;
@@ -574,7 +580,8 @@ small {
     width: 100%;
     height: auto;
     aspect-ratio: 3/4;
-    object-fit: cover;
+    object-fit: contain;
+    background: #edf0e8;
     border-radius: 7px;
     box-shadow: 0 12px 26px #2a342920;
 }
@@ -610,6 +617,8 @@ small {
     color: #9b4b23;
 }
 .description {
+    white-space: pre-line;
+    overflow-wrap: anywhere;
     white-space: pre-line;
     line-height: 1.85;
     font-size: 0.88rem;
@@ -1080,13 +1089,16 @@ details {
 }
 @media (max-width: 800px) {
     .sidebar {
+        top: 54px;
+        visibility: hidden;
         transform: translateX(-100%);
         transition: transform 0.2s;
         width: 238px;
-        padding-bottom: 130px;
+        padding-bottom: 24px;
         box-shadow: 10px 0 35px #0002;
     }
     .sidebar.open {
+        visibility: visible;
         transform: none;
     }
     .mobile-menu {
@@ -1193,15 +1205,17 @@ details {
         flex-direction: column;
         align-items: flex-start;
     }
-    .sort {
-        display: none;
-    }
+    .browse-toolbar { flex-wrap: wrap; }
+    .browse-toolbar .search { flex-basis: 100%; max-width: none; }
+    .sort { display: block; margin-right: auto; }
     .toast {
         bottom: 155px;
         max-width: 90%;
         width: max-content;
     }
     .description {
+    white-space: pre-line;
+    overflow-wrap: anywhere;
         line-height: 1.7;
     }
     .document-frame,
@@ -1385,3 +1399,41 @@ legend {
         max-width: none;
     }
 }
+
+.nav-backdrop { position: fixed; inset: 54px 0 0; z-index: 29; border: 0; background: #102b2366; }
+body.nav-open { overflow: hidden; }
+.synopsis { margin-top: 24px; }
+.synopsis summary { cursor: pointer; color: var(--green); font-weight: 600; padding: 12px 0; }
+.synopsis .description { margin-top: 12px; }
+.playback-help { flex-basis: 100%; font-size: .82rem; line-height: 1.5; }
+.playback-help p { margin: 0 0 8px; }
+.playback-help a { text-decoration: underline; }
+.playback-help details { margin-top: 10px; }
+.entity-card { transition: border-color .15s, box-shadow .15s; }
+a.entity-card:hover { border-color: #799785; box-shadow: 0 4px 18px #173d3610; }
+.entity-card .button-row { margin-top: 16px; }
+.entity-card small { overflow-wrap: anywhere; }
+.advanced-options { padding: 18px; background: #f6f8f3; border: 1px solid var(--line); border-radius: 8px; }
+.advanced-options summary { cursor: pointer; font-weight: 600; }
+.advanced-options[open] > summary { margin-bottom: 18px; }
+.check { padding-block: 8px; line-height: 1.5; }
+.stat-card strong { font-size: clamp(1.7rem, 2.8vw, 2.4rem); overflow-wrap: anywhere; }
+.tabs a { color: #58665c; }
+.admin-nav-group { margin-bottom: 12px; }
+.admin-nav-group .nav-label { margin: 0 0 8px; }
+.admin-nav-group .section-nav { margin: 0; }
+.admin-navigation { margin-bottom: 26px; }
+@media (max-width: 600px) {
+    .episode { flex-direction: column; }
+    .episode-actions { max-width: none; width: 100%; align-items: center; }
+    .episode-actions .button { width: auto; min-height: 44px; }
+    .item-hero { display: block; }
+    .hero-cover { width: 120px; margin: 0 auto 20px; }
+    .hero-cover img { max-height: 160px; }
+    .item-hero h1 { font-size: 1.9rem; text-align: center; }
+    .item-byline, .item-hero .eyebrow { text-align: center; }
+    .section-heading { flex-wrap: wrap; gap: 12px; }
+    .chapter-list button { min-height: 44px; }
+}
+
+body.has-player .sidebar { padding-bottom: 140px; }
