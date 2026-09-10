@@ -61,8 +61,8 @@ class KnowledgeControllerTest extends TestCase
     public function test_source_settings_are_sent_with_boolean_and_integer_types(): void
     {
         $this->backend(['/api/knowledge/sources' => ['id' => 'source-1']], mediaType: 'podcast');
-        $this->post('/sources', ['name' => 'Lectures', 'url' => 'https://www.youtube.com/@lectures', 'libraryId' => self::LIBRARY, 'libraryFolderId' => self::FOLDER, 'mode' => 'video', 'intervalMinutes' => '360', 'retentionDays' => '0', 'maxItems' => '20', 'enabled' => '1'])->assertRedirectToRoute('sources');
-        Http::assertSent(fn ($request) => $request->url() === 'http://shelf.test/api/knowledge/sources' && $request['enabled'] === true && $request['retentionDays'] === 0 && $request['mode'] === 'video');
+        $this->post('/sources', ['name' => 'Lectures', 'url' => 'https://www.youtube.com/@lectures', 'libraryId' => self::LIBRARY, 'libraryFolderId' => self::FOLDER, 'mode' => 'video', 'videoQuality' => '720', 'intervalMinutes' => '360', 'retentionDays' => '0', 'maxItems' => '20', 'enabled' => '1'])->assertRedirectToRoute('sources');
+        Http::assertSent(fn ($request) => $request->url() === 'http://shelf.test/api/knowledge/sources' && $request['enabled'] === true && $request['retentionDays'] === 0 && $request['mode'] === 'video' && $request['videoQuality'] === 720);
     }
 
     public function test_voice_service_failure_keeps_the_document_preview_accessible(): void

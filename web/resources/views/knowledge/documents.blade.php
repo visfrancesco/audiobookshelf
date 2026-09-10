@@ -11,7 +11,15 @@
 @empty<div class="empty-inline"><h2>Your reading list, ready to listen.</h2><p>Add a file, paste an article link, or start with text.</p></div>
 @endforelse</div>
 @include('knowledge.page-links', ['total' => $documents['total']])
-@if($isAdmin || ($shelfUser['permissions']['upload'] ?? false))<section id="new-document" class="panel"><h2>Add a document</h2><form action="{{ route('documents.create') }}" method="post" enctype="multipart/form-data" class="stack">
-@csrf<div class="form-grid"><x-field name="title" label="Title" required maxlength="300" /><x-field name="author" label="Author" maxlength="300" /></div><x-destination /><p class="muted">Choose one source below. You can review and edit all extracted text before creating audio.</p><x-field name="url" label="Article URL" type="url" /><label class="field"><span>Or upload a document</span><input type="file" name="file" accept=".txt,.md,.html,.htm,.pdf,.epub,.docx"><small>TXT, Markdown, HTML, PDF, EPUB or DOCX · up to 20 MB</small></label><x-field name="text" label="Or paste text" type="textarea" rows="8" /><button class="button primary">Prepare preview</button></form></section>
+@if($isAdmin || ($shelfUser['permissions']['upload'] ?? false))<details id="new-document" class="panel" @if(!$documents['total'] || $errors->any()) open @endif><summary>Add a document</summary><form action="{{ route('documents.create') }}" method="post" enctype="multipart/form-data" class="stack">
+@csrf
+<p class="muted">Choose a source. You can review and edit the extracted text before creating audio.</p>
+<label class="field" hidden><span>Document source</span><select data-document-source><option value="url" @selected(!old('text'))>Article link</option><option value="file">Upload a file</option><option value="text" @selected(old('text'))>Paste text</option></select></label>
+<div data-source-input="url"><x-field name="url" label="Article URL" type="url" /></div>
+<div data-source-input="file"><label class="field"><span>Upload a document</span><input type="file" name="file" accept=".txt,.md,.html,.htm,.pdf,.epub,.docx"><small>TXT, Markdown, HTML, PDF, EPUB or DOCX · up to 20 MB</small></label></div>
+<div data-source-input="text"><x-field name="text" label="Document text" type="textarea" rows="8" /></div>
+<div class="form-grid"><x-field name="title" label="Title" required maxlength="300" /><x-field name="author" label="Author" maxlength="300" /></div>
+<x-destination />
+<button class="button primary">Prepare preview</button></form></details>
 @endif
 @endsection

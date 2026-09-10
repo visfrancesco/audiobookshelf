@@ -39,12 +39,14 @@ describe('KnowledgeShelf browser workflows', () => {
 
     it('prepares a document and shows a full editable preview', () => {
         cy.contains('.nav-link', 'Documents').click()
+        cy.contains('a', 'Add document').click()
         cy.get('input[name="title"]').type('Browser-reviewed article')
         cy.get('select[name="libraryId"] option')
             .contains('Web integration library')
             .then((option) => {
                 cy.get('select[name="libraryId"]').select(option.val())
             })
+        cy.get('[data-document-source]').select('text')
         cy.get('textarea[name="text"]').type('Keep the full document intact. A natural voice will read these words.')
         cy.contains('button', 'Prepare preview').click()
         cy.get('h1').should('contain', 'Browser-reviewed article')
@@ -58,7 +60,16 @@ describe('KnowledgeShelf browser workflows', () => {
 
     it('fits a narrow screen and opens navigation without horizontal scrolling', () => {
         cy.viewport(390, 844)
+        cy.get('#navigation').should('have.attr', 'inert')
         cy.get('[data-toggle-nav]').click()
+        cy.get('#navigation').should('not.have.attr', 'inert')
+        cy.get('.brand').should((element) => {
+            expect(element[0].getBoundingClientRect().top).to.be.at.least(54)
+        })
+        cy.get('#main').should('have.attr', 'inert')
+        cy.get('[data-toggle-nav]').trigger('keydown', { key: 'Escape' })
+        cy.get('#navigation').should('have.attr', 'inert')
+        cy.get('[data-toggle-nav]').should('be.focused').click()
         cy.contains('.nav-link', 'Documents').click()
         cy.get('h1').should('contain', 'Documents')
         cy.document().should((document) => {

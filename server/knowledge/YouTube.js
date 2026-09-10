@@ -43,7 +43,11 @@ class YouTube {
       '--max-filesize', '4G', '--match-filters', 'duration <= 43200 & !is_live', '--paths', directory, '--output', 'media.%(ext)s', '--print', 'after_move:%(filepath)j']
     if (source.startDate) args.push('--dateafter', source.startDate.replace(/-/g, ''))
     if (source.mode === 'audio') args.push('--format', 'bestaudio/best', '--extract-audio', '--audio-format', 'm4a')
-    else args.push('--format', 'bv*[ext=mp4][vcodec^=avc1][height<=1080]+ba[ext=m4a]/b[ext=mp4][vcodec^=avc1]/bv*[height<=1080]+ba/b', '--merge-output-format', 'mp4')
+    else {
+      const quality = source.options?.videoQuality ?? 1080
+      if (![360, 480, 720, 1080, 1440, 2160].includes(quality)) throw problem('Invalid video quality')
+      args.push('--format', `bv*[ext=mp4][vcodec^=avc1][height<=${quality}]+ba[ext=m4a]/b[ext=mp4][vcodec^=avc1][height<=${quality}]`, '--merge-output-format', 'mp4')
+    }
     const { stdout } = await this.invoke([...args, '--', `https://www.youtube.com/watch?v=${videoId}`], { signal, timeout: 4 * 3600000 })
     const lines = stdout.trim().split('\n').filter(Boolean)
     if (!lines.length) return null // Date/duration filters intentionally skipped this video.

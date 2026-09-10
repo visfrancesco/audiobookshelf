@@ -19,9 +19,12 @@ class KnowledgeController extends Controller
 
     public function saveSource(Request $request, ShelfApi $api, ?string $id = null): RedirectResponse
     {
-        $data = $request->validate(['name' => 'required|string|max:300', 'url' => 'required|url|max:2000', 'libraryId' => 'required|uuid', 'libraryFolderId' => 'required|uuid', 'mode' => 'required|in:audio,video', 'intervalMinutes' => 'required|integer|min:15|max:10080', 'retentionDays' => 'required|integer|min:0|max:3650', 'maxItems' => 'required|integer|min:1|max:100', 'startDate' => 'nullable|date_format:Y-m-d']);
+        $data = $request->validate(['name' => 'required|string|max:300', 'url' => 'required|url|max:2000', 'libraryId' => 'required|uuid', 'libraryFolderId' => 'required|uuid', 'mode' => 'required|in:audio,video', 'videoQuality' => 'sometimes|required|integer|in:360,480,720,1080,1440,2160', 'intervalMinutes' => 'required|integer|min:15|max:10080', 'retentionDays' => 'required|integer|min:0|max:3650', 'maxItems' => 'required|integer|min:1|max:100', 'startDate' => 'nullable|date_format:Y-m-d']);
         foreach (['intervalMinutes', 'retentionDays', 'maxItems'] as $key) {
             $data[$key] = (int) $data[$key];
+        }
+        if (isset($data['videoQuality'])) {
+            $data['videoQuality'] = (int) $data['videoQuality'];
         }
         $data['enabled'] = $request->boolean('enabled');
         if ($id) {

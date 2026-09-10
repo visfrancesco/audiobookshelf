@@ -33,6 +33,47 @@ describe('KnowledgeShelf library integration', function () {
     documentBody = { title: 'A readable document', author: 'Test author', text: 'Read the complete document exactly as it was written.', libraryId: context.libraries.book.library.id, libraryFolderId: context.libraries.book.folder.id }
   })
   afterEach(async () => { await manager.stop(); await context.close() })
+  it('persists quality changes without changing existing episode identities', async () => {
+    const source = await manager.createSource({ ...sourceBody, videoQuality: 720 }, context.user)
+    await drain(manager.queue)
+    const asset = await context.models.knowledgeAsset.findOne({ where: { sourceId: source.id } })
+    const original = await fs.readFile(await manager.validateVideo(await context.models.podcastEpisode.unscoped().findByPk(asset.episodeId), 'video'))
+    await manager.updateSource(source, { videoQuality: 480 })
+    await source.reload()
+    expect(source.options.videoQuality).to.equal(480)
+    await manager.updateSource(source, { enabled: false })
+    expect(source.options.videoQuality).to.equal(480)
+    const episode = await context.models.podcastEpisode.unscoped().findByPk(asset.episodeId)
+    expect(await fs.readFile(await manager.validateVideo(episode, 'video'))).to.deep.equal(original)
+  })
+  it('removes a native video through the opted-in episode endpoint and keeps its original excluded', async () => {
+    const source = await manager.createSource(sourceBody, context.user)
+    await drain(manager.queue)
+    const asset = await context.models.knowledgeAsset.findOne({ where: { sourceId: source.id } })
+    const episode = await context.models.podcastEpisode.unscoped().findByPk(asset.episodeId)
+    const original = await manager.validateVideo(episode, 'video')
+    const native = require('../../../server/managers/KnowledgeShelfManager')
+    const savedReady = native.ready
+    native.ready = true
+    context.user.permissions = { ...context.user.permissions, delete: true }
+    const controller = require('../../../server/controllers/PodcastController')
+    const app = express()
+    app.use((req, _, next) => { req.user = context.user; next() })
+    app.delete('/podcasts/:id/episode/:episodeId', controller.middleware.bind(controller), controller.removeEpisode.bind(controller))
+    const server = app.listen(0, '127.0.0.1')
+    await new Promise(resolve => server.once('listening', resolve))
+    try {
+      const response = await fetch(`http://127.0.0.1:${server.address().port}/podcasts/${source.libraryItemId}/episode/${episode.id}?includeVideoEpisodes=1`, { method: 'DELETE' })
+      expect(response.status).to.equal(200)
+      expect(await context.models.podcastEpisode.unscoped().findByPk(episode.id)).to.equal(null)
+      await asset.reload()
+      expect(asset.excluded).to.equal(true)
+      await fs.access(original)
+      await manager.enqueueSource(source)
+      await drain(manager.queue)
+      expect(await context.models.podcastEpisode.unscoped().count()).to.equal(0)
+    } finally { native.ready = savedReady; await new Promise(resolve => server.close(resolve)) }
+  })
   it('imports one original video with chapters, legacy filtering and native playback validation', async () => {
     const source = await manager.createSource(sourceBody, context.user)
     await drain(manager.queue)

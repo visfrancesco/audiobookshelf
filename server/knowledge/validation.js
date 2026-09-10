@@ -23,10 +23,12 @@ function youtubeURL(value) {
 }
 function sourceValues(body) {
   const mode = body.mode || 'video'
+  const videoQuality = body.videoQuality ?? body.options?.videoQuality ?? 1080
+  if (![360, 480, 720, 1080, 1440, 2160].includes(videoQuality)) throw problem('Choose a video quality between 360p and 2160p')
   if (!['audio', 'video'].includes(mode)) throw problem('Mode must be audio or video')
   if (body.enabled !== undefined && typeof body.enabled !== 'boolean') throw problem('Enabled must be a boolean')
   if (body.startDate && (!/^\d{4}-\d{2}-\d{2}$/.test(body.startDate) || !Number.isFinite(Date.parse(body.startDate)) || new Date(body.startDate).toISOString().slice(0, 10) !== body.startDate)) throw problem('Invalid start date')
-  return { name: text(body.name, 'source name'), url: youtubeURL(body.url), mode,
+  return { name: text(body.name, 'source name'), url: youtubeURL(body.url), mode, options: { videoQuality },
     enabled: body.enabled ?? true, intervalMinutes: integer(body.intervalMinutes, 'Check interval', 360, 15, 10080),
     retentionDays: integer(body.retentionDays, 'Retention', 0, 0, 3650), maxItems: integer(body.maxItems, 'Maximum items per check', 20, 1, 100), startDate: body.startDate || null }
 }

@@ -16,6 +16,13 @@ class MediaTime
     {
         $seconds = max(0, (int) $seconds);
 
+        if ($seconds < 60) {
+            return $seconds.'s';
+        }
+        if ($seconds < 3600) {
+            return intdiv($seconds, 60).'m';
+        }
+
         return sprintf('%dh %dm', intdiv($seconds, 3600), intdiv($seconds % 3600, 60));
     }
 }

@@ -1,13 +1,15 @@
 <div wire:poll.10s>
-<div class="section-heading"><p class="muted">{{ $result['total'] }} jobs · updates every 10 seconds</p><label class="field compact"><span class="sr-only">Filter by status</span><select wire:model.live="state"><option value="">All activity</option>
+<div class="section-heading"><p class="muted">{{ $result['total'] }} {{ $result['total'] === 1 ? 'job' : 'jobs' }} · updates every 10 seconds</p><label class="field compact"><span class="sr-only">Filter by status</span><select wire:model.live="state"><option value="">All activity</option>
 @foreach(['queued', 'running', 'completed', 'failed', 'needs_review', 'cancelled', 'retry', 'cancelling'] as $option)<option value="{{ $option }}">{{ ucfirst(str_replace('_', ' ', $option)) }}</option>
 @endforeach</select></label></div>
 <div class="job-list">
 @forelse($result['jobs'] as $job)<article class="job-row" wire:key="job-{{ $job['id'] }}"><div class="job-copy"><span class="status-badge">{{ ucfirst(str_replace('_', ' ', $job['state'])) }}</span><h3>{{ match($job['kind']) { 'youtube.check' => 'Check YouTube source', 'youtube.download' => 'Download episode', 'document.extract' => 'Prepare document', 'document.narrate' => 'Narrate document', default => ucfirst(str_replace('.', ' ', $job['kind'])) } }}</h3><small>{{ \Carbon\Carbon::parse($job['createdAt'])->diffForHumans() }}
 @if($job['completedChunks']) · {{ $job['completedChunks'] }} sections saved
 @endif</small>
+@if(!empty($job['sourceId']) && $isAdmin)<a href="{{ route('source', $job['sourceId']) }}" wire:navigate>Open YouTube source →</a>@endif
 @if(!empty($job['documentId']))<a href="{{ route('document', $job['documentId']) }}" wire:navigate>Open document →</a>
 @endif
+@if(isset($job['result']['discovered']))<p>{{ $job['result']['discovered'] }} episodes found in this source check.</p>@elseif(!empty($job['result']['skipped']))<p>Skipped because this episode did not match the source filters.</p>@endif
 @if($job['error'])<p class="danger">{{ $job['error'] }}</p>
 @endif
 @if($job['state'] === 'running')<progress max="1" value="{{ $job['progress'] }}" aria-label="Job progress"></progress>
