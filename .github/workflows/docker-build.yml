@@ -88,6 +88,7 @@ jobs:
         working-directory: web
         run: |
           npm ci
+          npx cypress install
           npm run test:browser
       - name: Save browser screenshots
         if: always() && matrix.arch == 'amd64'
