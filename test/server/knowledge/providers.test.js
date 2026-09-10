@@ -4,6 +4,16 @@ const YouTube = require('../../../server/knowledge/YouTube')
 const { rejects } = require('./helpers')
 
 describe('KnowledgeShelf provider contracts', () => {
+  it('discovers episodes inside channel tabs and caps the combined result', async () => {
+    const info = { entries: [
+      { _type: 'playlist', id: 'channel-id', entries: [null, { id: 'livevideo01', live_status: 'is_live' }, { id: 'abcdefghijk', title: 'First episode' }] },
+      { _type: 'playlist', id: 'channel-id', entries: [{ id: 'lmnopqrstuv', title: 'Second episode' }, { id: '12345678901' }] }
+    ] }
+    const provider = new YouTube({ execute: async () => ({ stdout: JSON.stringify(info) }) })
+    expect(await provider.list({ url: 'https://youtube.com/@channel', maxItems: 2 })).to.deep.equal([
+      { id: 'abcdefghijk', title: 'First episode' }, { id: 'lmnopqrstuv', title: 'Second episode' }
+    ])
+  })
   it('caps every video format alternative and avoids unwatchable codec fallbacks', async () => {
     const fs = require('fs/promises'), Path = require('path'), os = require('os')
     const directory = await fs.mkdtemp(Path.join(os.tmpdir(), 'quality-test-'))

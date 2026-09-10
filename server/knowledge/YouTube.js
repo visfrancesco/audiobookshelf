@@ -32,8 +32,17 @@ class YouTube {
   async list(source, signal) {
     const { stdout } = await this.invoke([...this.base(), '--flat-playlist', '--dump-single-json', '--playlist-end', String(source.maxItems), '--', youtubeURL(source.url)], { signal, timeout: 120000, maxBytes: 16 * 1024 ** 2 })
     const info = JSON.parse(stdout)
-    return (info.entries || [info]).filter(entry => entry && /^[\w-]{11}$/.test(entry.id) && !['is_live', 'is_upcoming'].includes(entry.live_status))
-      .filter(entry => !source.startDate || !entry.upload_date || entry.upload_date >= source.startDate.replace(/-/g, '')).slice(0, source.maxItems)
+    const entries = []
+    const pending = [info]
+    while (pending.length && entries.length < source.maxItems) {
+      const entry = pending.pop()
+      if (!entry) continue
+      if (Array.isArray(entry.entries)) {
+        for (let index = entry.entries.length - 1; index >= 0; index--) pending.push(entry.entries[index])
+      } else if (/^[\w-]{11}$/.test(entry.id) && !['is_live', 'is_upcoming'].includes(entry.live_status) &&
+        (!source.startDate || !entry.upload_date || entry.upload_date >= source.startDate.replace(/-/g, ''))) entries.push(entry)
+    }
+    return entries
       .map(entry => ({ id: entry.id, title: entry.title || entry.id }))
   }
   async download(source, videoId, directory, signal) {
