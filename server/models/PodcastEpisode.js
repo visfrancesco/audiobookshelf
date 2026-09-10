@@ -230,6 +230,7 @@ class PodcastEpisode extends Model {
       chapters: structuredClone(this.chapters),
       audioFile: structuredClone(this.audioFile),
       videoSource: publicVideoSource(this.videoSource),
+      ...(this.videoSource ? { duration: this.duration, size: this.size } : {}),
       publishedAt: this.publishedAt?.valueOf() || null,
       addedAt: this.createdAt.valueOf(),
       updatedAt: this.updatedAt.valueOf()

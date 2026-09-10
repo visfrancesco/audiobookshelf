@@ -338,7 +338,7 @@ class LibraryItem extends Model {
    * @param {number} limit
    * @returns {object[]} array of shelf objects
    */
-  static async getPersonalizedShelves(library, user, include, limit) {
+  static async getPersonalizedShelves(library, user, include, limit, includeVideoEpisodes = false) {
     const fullStart = Date.now() // Used for testing load times
 
     const shelves = []
@@ -353,7 +353,7 @@ class LibraryItem extends Model {
     }
 
     // "Continue Listening" shelf
-    const itemsInProgressPayload = await libraryFilters.getMediaItemsInProgress(library, user, include, limit, false)
+    const itemsInProgressPayload = await libraryFilters.getMediaItemsInProgress(library, user, include, limit, includeVideoEpisodes)
     if (itemsInProgressPayload.items.length) {
       const ebookOnlyItemsInProgress = itemsInProgressPayload.items.filter((li) => li.media.ebookFormat && !li.media.numTracks)
       const audioItemsInProgress = itemsInProgressPayload.items.filter((li) => li.media.numTracks || li.mediaType === 'podcast')
@@ -386,10 +386,10 @@ class LibraryItem extends Model {
     if (library.isBook) {
       const [continueSeriesResult, mostRecentResult, seriesMostRecentResult, discoverResult, mediaFinishedResult, newestAuthorsResult] = await Promise.all([
         timed(() => libraryFilters.getLibraryItemsContinueSeries(library, user, include, limit)),
-        timed(() => libraryFilters.getLibraryItemsMostRecentlyAdded(library, user, include, limit)),
+        timed(() => libraryFilters.getLibraryItemsMostRecentlyAdded(library, user, include, limit, includeVideoEpisodes)),
         timed(() => libraryFilters.getSeriesMostRecentlyAdded(library, user, include, 5)),
         timed(() => libraryFilters.getLibraryItemsToDiscover(library, user, include, limit)),
-        timed(() => libraryFilters.getMediaFinished(library, user, include, limit)),
+        timed(() => libraryFilters.getMediaFinished(library, user, include, limit, includeVideoEpisodes)),
         timed(() => libraryFilters.getNewestAuthors(library, user, limit))
       ])
 
@@ -495,9 +495,9 @@ class LibraryItem extends Model {
       Logger.debug(`Loaded ${newestAuthorsPayload.authors.length} of ${newestAuthorsPayload.count} authors for "Newest Authors" in ${newestAuthorsResult.elapsedSeconds}s`)
     } else if (library.isPodcast) {
       const [newestEpisodesResult, mostRecentResult, mediaFinishedResult] = await Promise.all([
-        timed(() => libraryFilters.getNewestPodcastEpisodes(library, user, limit)),
-        timed(() => libraryFilters.getLibraryItemsMostRecentlyAdded(library, user, include, limit)),
-        timed(() => libraryFilters.getMediaFinished(library, user, include, limit))
+        timed(() => libraryFilters.getNewestPodcastEpisodes(library, user, limit, includeVideoEpisodes)),
+        timed(() => libraryFilters.getLibraryItemsMostRecentlyAdded(library, user, include, limit, includeVideoEpisodes)),
+        timed(() => libraryFilters.getMediaFinished(library, user, include, limit, includeVideoEpisodes))
       ])
 
       const newestEpisodesPayload = newestEpisodesResult.payload

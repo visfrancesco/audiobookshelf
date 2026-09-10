@@ -2,7 +2,7 @@ ARG NUSQLITE3_DIR="/usr/local/lib/nusqlite3"
 ARG NUSQLITE3_PATH="${NUSQLITE3_DIR}/libnusqlite3.so"
 
 ### Build the Laravel assets and production PHP dependencies ###
-FROM node:22-alpine AS build-web-assets
+FROM --platform=$BUILDPLATFORM node:22-alpine AS build-web-assets
 WORKDIR /web
 COPY web/package*.json ./
 RUN CYPRESS_INSTALL_BINARY=0 npm ci

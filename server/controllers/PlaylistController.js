@@ -118,7 +118,7 @@ class PlaylistController {
       newPlaylist.playlistMediaItems = await newPlaylist.getMediaItemsExpandedWithLibraryItem(req.query.includeVideoEpisodes === '1')
 
       const jsonExpanded = newPlaylist.toOldJSONExpanded()
-      SocketAuthority.clientEmitter(newPlaylist.userId, 'playlist_added', jsonExpanded)
+      SocketAuthority.clientEmitter(newPlaylist.userId, 'playlist_added', { ...jsonExpanded, items: jsonExpanded.items.filter(item => !item.episode?.videoSource) })
       res.json(jsonExpanded)
     } catch (error) {
       await transaction.rollback()
@@ -253,7 +253,7 @@ class PlaylistController {
 
     const jsonExpanded = req.playlist.toOldJSONExpanded()
     if (wasUpdated) {
-      SocketAuthority.clientEmitter(req.playlist.userId, 'playlist_updated', jsonExpanded)
+      SocketAuthority.clientEmitter(req.playlist.userId, 'playlist_updated', { ...jsonExpanded, items: jsonExpanded.items.filter(item => !item.episode?.videoSource) })
     }
     res.json(jsonExpanded)
   }
@@ -270,7 +270,7 @@ class PlaylistController {
     const jsonExpanded = req.playlist.toOldJSONExpanded()
 
     await req.playlist.destroy()
-    SocketAuthority.clientEmitter(jsonExpanded.userId, 'playlist_removed', jsonExpanded)
+    SocketAuthority.clientEmitter(jsonExpanded.userId, 'playlist_removed', { ...jsonExpanded, items: jsonExpanded.items.filter(item => !item.episode?.videoSource) })
     res.sendStatus(200)
   }
 
@@ -336,7 +336,7 @@ class PlaylistController {
       })
     }
 
-    SocketAuthority.clientEmitter(jsonExpanded.userId, 'playlist_updated', jsonExpanded)
+    SocketAuthority.clientEmitter(jsonExpanded.userId, 'playlist_updated', { ...jsonExpanded, items: jsonExpanded.items.filter(item => !item.episode?.videoSource) })
     res.json(jsonExpanded)
   }
 
@@ -379,9 +379,9 @@ class PlaylistController {
     if (!jsonExpanded.items.length) {
       Logger.info(`[PlaylistController] Playlist "${jsonExpanded.name}" has no more items - removing it`)
       await req.playlist.destroy()
-      SocketAuthority.clientEmitter(jsonExpanded.userId, 'playlist_removed', jsonExpanded)
+      SocketAuthority.clientEmitter(jsonExpanded.userId, 'playlist_removed', { ...jsonExpanded, items: jsonExpanded.items.filter(item => !item.episode?.videoSource) })
     } else {
-      SocketAuthority.clientEmitter(jsonExpanded.userId, 'playlist_updated', jsonExpanded)
+      SocketAuthority.clientEmitter(jsonExpanded.userId, 'playlist_updated', { ...jsonExpanded, items: jsonExpanded.items.filter(item => !item.episode?.videoSource) })
     }
 
     res.json(jsonExpanded)
@@ -450,7 +450,7 @@ class PlaylistController {
     if (mediaItemsToAdd.length) {
       await Database.playlistMediaItemModel.bulkCreate(mediaItemsToAdd)
 
-      SocketAuthority.clientEmitter(req.playlist.userId, 'playlist_updated', jsonExpanded)
+      SocketAuthority.clientEmitter(req.playlist.userId, 'playlist_updated', { ...jsonExpanded, items: jsonExpanded.items.filter(item => !item.episode?.videoSource) })
     }
 
     res.json(jsonExpanded)
@@ -496,9 +496,9 @@ class PlaylistController {
       if (!req.playlist.playlistMediaItems.length) {
         Logger.info(`[PlaylistController] Playlist "${req.playlist.name}" has no more items - removing it`)
         await req.playlist.destroy()
-        SocketAuthority.clientEmitter(jsonExpanded.userId, 'playlist_removed', jsonExpanded)
+        SocketAuthority.clientEmitter(jsonExpanded.userId, 'playlist_removed', { ...jsonExpanded, items: jsonExpanded.items.filter(item => !item.episode?.videoSource) })
       } else {
-        SocketAuthority.clientEmitter(jsonExpanded.userId, 'playlist_updated', jsonExpanded)
+        SocketAuthority.clientEmitter(jsonExpanded.userId, 'playlist_updated', { ...jsonExpanded, items: jsonExpanded.items.filter(item => !item.episode?.videoSource) })
       }
     }
     res.json(jsonExpanded)
@@ -560,7 +560,7 @@ class PlaylistController {
       playlist.playlistMediaItems = await playlist.getMediaItemsExpandedWithLibraryItem(req.query.includeVideoEpisodes === '1')
 
       const jsonExpanded = playlist.toOldJSONExpanded()
-      SocketAuthority.clientEmitter(playlist.userId, 'playlist_added', jsonExpanded)
+      SocketAuthority.clientEmitter(playlist.userId, 'playlist_added', { ...jsonExpanded, items: jsonExpanded.items.filter(item => !item.episode?.videoSource) })
       res.json(jsonExpanded)
     } catch (error) {
       await transaction.rollback()

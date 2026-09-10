@@ -143,7 +143,7 @@ module.exports = {
    * @param {number} offset
    * @returns {Promise<{ libraryItems: import('../../models/LibraryItem')[], count: number }>}
    */
-  async getFilteredLibraryItems(libraryId, user, filterGroup, filterValue, sortBy, sortDesc, include, limit, offset) {
+  async getFilteredLibraryItems(libraryId, user, filterGroup, filterValue, sortBy, sortDesc, include, limit, offset, includeVideoEpisodes = false) {
     const includeRSSFeed = include.includes('rssfeed')
     const includeNumEpisodesIncomplete = include.includes('numepisodesincomplete')
 
@@ -174,7 +174,9 @@ module.exports = {
       }
     }
 
-    const podcastIncludes = []
+    const podcastIncludes = includeVideoEpisodes
+      ? [[Sequelize.literal('(SELECT COUNT(*) FROM podcastEpisodes pe WHERE pe.podcastId = podcast.id)'), 'numEpisodes']]
+      : []
 
     let { mediaWhere, replacements } = this.getMediaGroupQuery(filterGroup, filterValue)
     replacements.userId = user.id
@@ -253,7 +255,7 @@ module.exports = {
    * @param {boolean} isHomePage for home page shelves
    * @returns {Promise<{ libraryItems: import('../../models/LibraryItem')[], count: number }>}
    */
-  async getFilteredPodcastEpisodes(libraryId, user, filterGroup, filterValue, sortBy, sortDesc, limit, offset, isHomePage = false) {
+  async getFilteredPodcastEpisodes(libraryId, user, filterGroup, filterValue, sortBy, sortDesc, limit, offset, isHomePage = false, includeVideoEpisodes = false) {
     if (sortBy === 'progress' && filterGroup !== 'progress') {
       Logger.warn('Cannot sort podcast episodes by progress without filtering by progress')
       sortBy = 'createdAt'
@@ -331,7 +333,7 @@ module.exports = {
 
     const findAndCountAll = process.env.QUERY_PROFILING ? profile(this.findAndCountAll) : this.findAndCountAll
 
-    const { rows: podcastEpisodes, count } = await findAndCountAll(findOptions, Database.podcastEpisodeModel, limit, offset, !filterGroup)
+    const { rows: podcastEpisodes, count } = await findAndCountAll(findOptions, includeVideoEpisodes ? Database.podcastEpisodeModel.unscoped() : Database.podcastEpisodeModel, limit, offset, !filterGroup && !includeVideoEpisodes)
 
     const libraryItems = podcastEpisodes.map((ep) => {
       const libraryItem = ep.podcast.libraryItem
@@ -358,7 +360,7 @@ module.exports = {
    * @param {number} offset
    * @returns {{podcast:object[], tags:object[]}}
    */
-  async search(user, library, query, limit, offset) {
+  async search(user, library, query, limit, offset, includeVideoEpisodes = false) {
     const userPermissionPodcastWhere = this.getUserPermissionPodcastWhereQuery(user)
 
     const textSearchQuery = await Database.createTextSearchQuery(query)
@@ -415,7 +417,7 @@ module.exports = {
     }
 
     // Search podcast episode title
-    const podcastEpisodes = await Database.podcastEpisodeModel.findAll({
+    const podcastEpisodes = await (includeVideoEpisodes ? Database.podcastEpisodeModel.unscoped() : Database.podcastEpisodeModel).findAll({
       where: [
         Sequelize.literal(textSearchQuery.matchExpression('podcastEpisode.title')),
         {
@@ -503,7 +505,7 @@ module.exports = {
    * @param {number} offset
    * @returns {Promise<object[]>}
    */
-  async getRecentEpisodes(user, library, limit, offset) {
+  async getRecentEpisodes(user, library, limit, offset, includeVideoEpisodes = false) {
     const userPermissionPodcastWhere = this.getUserPermissionPodcastWhereQuery(user)
 
     const findOptions = {
@@ -539,7 +541,8 @@ module.exports = {
       offset
     }
 
-    const findtAll = process.env.QUERY_PROFILING ? profile(Database.podcastEpisodeModel.findAll.bind(Database.podcastEpisodeModel)) : Database.podcastEpisodeModel.findAll.bind(Database.podcastEpisodeModel)
+    const model = includeVideoEpisodes ? Database.podcastEpisodeModel.unscoped() : Database.podcastEpisodeModel
+    const findtAll = process.env.QUERY_PROFILING ? profile(model.findAll.bind(model)) : model.findAll.bind(model)
 
     const episodes = await findtAll(findOptions)
 
@@ -562,13 +565,13 @@ module.exports = {
    * @param {string} libraryId
    * @returns {Promise<{ totalSize:number, totalDuration:number, numAudioFiles:number, totalItems:number}>}
    */
-  async getPodcastLibraryStats(libraryId) {
+  async getPodcastLibraryStats(libraryId, includeVideoEpisodes = false) {
     const [sizeResults] = await Database.sequelize.query(`SELECT SUM(li.size) AS totalSize FROM libraryItems li WHERE li.mediaType = "podcast" AND li.libraryId = :libraryId;`, {
       replacements: {
         libraryId
       }
     })
-    const [statResults] = await Database.sequelize.query(`SELECT SUM(json_extract(pe.audioFile, '$.duration')) AS totalDuration, COUNT(DISTINCT(li.id)) AS totalItems, COUNT(pe.id) AS numAudioFiles FROM libraryItems li, podcasts p LEFT OUTER JOIN podcastEpisodes pe ON pe.podcastId = p.id AND pe.videoSource IS NULL WHERE p.id = li.mediaId AND li.libraryId = :libraryId;`, {
+    const [statResults] = await Database.sequelize.query(`SELECT SUM(COALESCE(json_extract(pe.videoSource, '$.duration'), json_extract(pe.audioFile, '$.duration'))) AS totalDuration, SUM(COALESCE(json_extract(pe.videoSource, '$.size'), 0)) AS videoSize, COUNT(DISTINCT(li.id)) AS totalItems, COUNT(pe.id) AS numAudioFiles FROM libraryItems li, podcasts p LEFT OUTER JOIN podcastEpisodes pe ON pe.podcastId = p.id ${includeVideoEpisodes ? '' : 'AND pe.videoSource IS NULL'} WHERE p.id = li.mediaId AND li.libraryId = :libraryId;`, {
       replacements: {
         libraryId
       }
@@ -577,7 +580,7 @@ module.exports = {
       totalDuration: statResults?.[0]?.totalDuration || 0,
       numAudioFiles: statResults?.[0]?.numAudioFiles || 0,
       totalItems: statResults?.[0]?.totalItems || 0,
-      totalSize: sizeResults?.[0]?.totalSize || 0
+      totalSize: (sizeResults?.[0]?.totalSize || 0) + (statResults?.[0]?.videoSize || 0)
     }
   },
 
@@ -609,9 +612,9 @@ module.exports = {
    * @param {number} limit
    * @returns {Promise<{ id:string, title:string, duration:number }[]>}
    */
-  async getLongestPodcasts(libraryId, limit) {
+  async getLongestPodcasts(libraryId, limit, includeVideoEpisodes = false) {
     const podcasts = await Database.podcastModel.findAll({
-      attributes: ['id', 'title', [Sequelize.literal(`(SELECT SUM(json_extract(pe.audioFile, '$.duration')) FROM podcastEpisodes pe WHERE pe.podcastId = podcast.id)`), 'duration']],
+      attributes: ['id', 'title', [Sequelize.literal(`(SELECT SUM(COALESCE(json_extract(pe.videoSource, '$.duration'), json_extract(pe.audioFile, '$.duration'))) FROM podcastEpisodes pe WHERE pe.podcastId = podcast.id ${includeVideoEpisodes ? '' : 'AND pe.videoSource IS NULL'})`), 'duration']],
       include: {
         model: Database.libraryItemModel,
         attributes: ['id', 'libraryId'],
